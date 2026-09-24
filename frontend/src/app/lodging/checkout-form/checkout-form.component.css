@@ -1,0 +1,43 @@
+@import url('../../shared/styles/form-page.css');
+@import url('../../shared/styles/detail-page.css');
+
+.stay-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: #F8F4EE;
+  border-radius: 10px;
+  border: 1px solid #E8DCCB;
+}
+
+.stay-total--highlight {
+  background: #EEF4FB;
+  border-color: #C8DCF0;
+}
+
+.total-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #7A7A7A;
+}
+
+.total-amount {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2B2B2B;
+}
+
+.total-amount--big {
+  font-size: 22px;
+  color: #0A3D6D;
+}
+
+.btn-checkout {
+  background: linear-gradient(90deg, #0A3D6D, #0E5A9C);
+}
+
+.font-bold { font-weight: 700; }

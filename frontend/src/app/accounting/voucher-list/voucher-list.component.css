@@ -1,0 +1,31 @@
+@import url('../../shared/styles/list-page.css');
+
+.header-actions { display:flex; gap:10px; flex-wrap:wrap; }
+
+.btn-outline-sm {
+  padding:9px 16px; border:1px solid #0E5A9C; border-radius:10px;
+  background:#fff; color:#0E5A9C; font-family:'Poppins',sans-serif;
+  font-size:13px; font-weight:600; cursor:pointer; transition:background .2s;
+}
+.btn-outline-sm:hover { background:#EEF4FB; }
+
+/* Type badges */
+.type-badge {
+  display:inline-block; padding:3px 8px; border-radius:6px;
+  font-size:11px; font-weight:700; letter-spacing:.04em;
+}
+.type-badge--ing { background:#ECFDF5; color:#166534; }
+.type-badge--egr { background:#FEF2F2; color:#991B1B; }
+.type-badge--pag { background:#EFF6FF; color:#1D4ED8; }
+.type-badge--fac { background:#FFFBEB; color:#92400E; }
+.type-badge--nom { background:#EDE9FE; color:#5B21B6; }
+
+/* Status badges */
+.res-badge--acc-pub  { background:#ECFDF5; color:#166534; border:1px solid #BBF7D0; }
+.res-badge--acc-proc { background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; }
+.res-badge--acc-rev  { background:#FFFBEB; color:#92400E; border:1px solid #FDE68A; }
+.res-badge--acc-ann  { background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; }
+
+.text-right  { text-align:right; }
+.inv-total   { font-weight:700; color:#0A3D6D; }
+.legend-text { font-size:12px; color:#7A7A7A; margin-right:12px; }

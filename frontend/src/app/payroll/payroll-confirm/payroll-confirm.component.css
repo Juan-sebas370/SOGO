@@ -1,0 +1,11 @@
+@import url('../../lodging/checkin-confirm/checkin-confirm.component.css');
+@import url('../payroll-list/payroll-list.component.css');
+
+.summary-row--net {
+  margin-top:8px;
+  padding-top:12px;
+  border-top:2px solid #E8DCCB;
+  border-bottom:none !important;
+}
+.summary-value--net { font-size:22px; color:#166534; font-weight:800; }
+.text-danger { color:#DC2626; font-weight:700; }

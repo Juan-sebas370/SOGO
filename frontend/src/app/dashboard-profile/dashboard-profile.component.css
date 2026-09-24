@@ -1,0 +1,46 @@
+.dash-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 2px 8px rgba(14,90,156,0.05);
+  max-width: 480px;
+}
+
+.dash-card-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 0 0 6px;
+}
+
+.dash-card-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #7A7A7A;
+  margin: 0 0 20px;
+}
+
+.dash-profile-fields {
+  display: grid;
+  gap: 16px;
+}
+
+.dash-card-label {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #7A7A7A;
+  margin: 0 0 4px;
+}
+
+.dash-card-value {
+  display: block;
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2B2B2B;
+  margin: 0;
+}

@@ -1,0 +1,505 @@
+/* =====================================================
+   DASHBOARD — Paleta SOGO
+   ===================================================== */
+
+.dash-page {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  background: #F3F6FB;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* ══════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════ */
+.dash-sidebar {
+  background: linear-gradient(180deg, #0A3D6D 0%, #0B2E52 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* Logo */
+.dash-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 8px;
+}
+
+.dash-brand-icon {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.05em;
+  font-family: 'Playfair Display', serif;
+  line-height: 1;
+}
+
+.dash-brand-text {
+  font-family: 'Poppins', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.06em;
+}
+
+/* Nav items */
+.dash-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 10px;
+  flex: 1;
+}
+
+.dash-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.68);
+  text-decoration: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  font-weight: 400;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dash-nav-item svg {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.dash-nav-item:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+.dash-nav-item.active,
+.dash-nav-item--active {
+  background: #0E5A9C;
+  color: #fff;
+  font-weight: 600;
+}
+
+.dash-nav-item--static {
+  opacity: 0.7;
+}
+
+.dash-nav-item--static:hover {
+  opacity: 1;
+}
+
+/* Logout */
+.dash-logout {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 8px 10px 0;
+  border-radius: 10px;
+  background: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.60);
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dash-logout svg {
+  width: 16px; height: 16px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-logout:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+
+/* ══════════════════════════════════════════
+   CONTENIDO PRINCIPAL
+══════════════════════════════════════════ */
+.dash-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Topbar */
+.dash-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  padding: 14px 32px;
+  border-bottom: 1px solid #E8DCCB;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Saludo */
+.dash-welcome-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7A7A7A;
+}
+
+.dash-welcome-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash-welcome-emoji { font-size: 20px; }
+
+.dash-welcome-sub {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #7A7A7A;
+  margin: 3px 0 0;
+}
+
+.dash-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Píldora de fecha */
+.dash-date-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #E8DCCB;
+  background: #FBF9F5;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #2B2B2B;
+  white-space: nowrap;
+}
+
+.dash-date-pill svg {
+  width: 16px; height: 16px;
+  stroke: #0E5A9C; fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.dash-date-chip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #EAF1F9;
+  color: #0A3D6D;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dash-date-chip svg {
+  width: 12px; height: 12px;
+  stroke: #0A3D6D; fill: none;
+  stroke-width: 2.5;
+}
+
+.dash-divider {
+  width: 1px;
+  height: 28px;
+  background: #E8DCCB;
+  flex-shrink: 0;
+}
+
+/* Notificaciones */
+.dash-notif-wrap { position: relative; }
+
+.dash-notif {
+  position: relative;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid #E8DCCB;
+  background: #F8F4EE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dash-notif:hover { background: #EDE7DC; }
+
+.dash-notif svg {
+  width: 18px; height: 18px;
+  stroke: #0E5A9C; fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-notif-badge {
+  position: absolute;
+  top: -3px; right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #DC2626;
+  color: #fff;
+  border: 2px solid #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 340px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #E8DCCB;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(10,61,109,0.14);
+  z-index: 20;
+}
+
+.dash-notif-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #F1EDE6;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2B2B2B;
+}
+
+.dash-notif-panel-count {
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.dash-notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+}
+
+.dash-notif-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dash-notif-row:hover { background: #F3F6FB; }
+
+.dash-notif-icon {
+  width: 30px; height: 30px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-notif-icon svg {
+  width: 15px; height: 15px;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dash-notif-icon--checkout    { background: #FEE2E2; }
+.dash-notif-icon--checkout    svg { stroke: #DC2626; }
+.dash-notif-icon--cleaning    { background: #FEF3C7; }
+.dash-notif-icon--cleaning    svg { stroke: #D97706; }
+.dash-notif-icon--maintenance { background: #FFEDD5; }
+.dash-notif-icon--maintenance svg { stroke: #EA580C; }
+.dash-notif-icon--review      { background: #DBEAFE; }
+.dash-notif-icon--review      svg { stroke: #2563EB; }
+.dash-notif-icon--inventory   { background: #DCFCE7; }
+.dash-notif-icon--inventory   svg { stroke: #16A34A; }
+.dash-notif-icon--billing     { background: #CCFBF1; }
+.dash-notif-icon--billing     svg { stroke: #0D9488; }
+
+.dash-notif-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.dash-notif-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2B2B2B;
+}
+
+.dash-notif-detail {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11.5px;
+  color: #7A7A7A;
+}
+
+.dash-notif-empty {
+  padding: 24px 18px;
+  text-align: center;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #7A7A7A;
+  margin: 0;
+}
+
+.dash-priority {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.dash-priority--Alta  { background: #FEE2E2; color: #B91C1C; }
+.dash-priority--Media { background: #FEF3C7; color: #92400E; }
+.dash-priority--Baja  { background: #DBEAFE; color: #1D4ED8; }
+
+/* Perfil */
+.dash-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+
+.dash-profile:hover { background: #F3F6FB; }
+
+.dash-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0A3D6D, #0E5A9C);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.dash-profile-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-profile-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2B2B2B;
+  line-height: 1.2;
+}
+
+.dash-profile-role {
+  font-size: 11px;
+  color: #7A7A7A;
+}
+
+.dash-chevron {
+  width: 16px; height: 16px;
+  stroke: #7A7A7A; fill: none;
+  stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Contenido */
+/* 20px (~0.5cm) es la unidad de separación entre "recuadros" en todo el
+   dashboard: este gap, el de .dash-row, el de .dash-stats, el de
+   .dash-quick-actions y el de .dash-rooms-grid usan el mismo valor a propósito,
+   en vez de la mezcla de 32/28/24/18/16px que había antes. */
+.dash-content {
+  padding: 6px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  flex: 1;
+}
+
+.dash-content > router-outlet {
+  display: none;
+}
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .dash-page { grid-template-columns: 190px 1fr; }
+}
+
+@media (max-width: 768px) {
+  .dash-page  { grid-template-columns: 1fr; }
+  .dash-sidebar { display: none; }
+  .dash-topbar  { padding: 12px 16px; flex-wrap: wrap; gap: 12px; }
+  .dash-content { padding: 16px; gap: 16px; }
+  .dash-date-pill span:first-of-type { display: none; }
+  .dash-notif-panel { width: min(340px, 92vw); right: -8px; }
+}

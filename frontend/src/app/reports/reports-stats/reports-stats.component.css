@@ -1,0 +1,63 @@
+@import url('../reports-dashboard/reports-dashboard.component.css');
+
+/* KPIs stats */
+.stats-kpi-grid {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:20px;
+}
+
+.stats-kpi-card {
+  background:#fff; border-radius:14px; padding:22px;
+  border:1px solid #E8DCCB; box-shadow:0 2px 8px rgba(14,90,156,.05);
+  display:flex; flex-direction:column; gap:6px;
+}
+.stats-kpi-card--income  { border-left:4px solid #0E5A9C; }
+.stats-kpi-card--expense { border-left:4px solid #EF4444; }
+.stats-kpi-card--profit  { border-left:4px solid #23B57B; }
+
+/* Charts stats */
+.stats-charts-grid {
+  display:grid; grid-template-columns:1.5fr 1fr; gap:20px;
+}
+.stats-chart-wide { }
+
+/* Occupancy gauge */
+.occupancy-donut {
+  display:flex; flex-direction:column; align-items:center; gap:16px; margin-top:12px;
+}
+
+.occupancy-scale {
+  display:flex; align-items:center; gap:10px; width:100%;
+  font-family:'Poppins',sans-serif; font-size:11px; color:#7A7A7A;
+}
+
+.scale-bar {
+  flex:1; height:8px; background:#F0EBE1; border-radius:4px; overflow:hidden;
+}
+
+.scale-fill { height:100%; background:#0E5A9C; border-radius:4px; transition:width .5s; }
+
+/* Grouped bars */
+.grouped-bar-chart {
+  display:flex; align-items:flex-end; gap:10px; height:130px;
+  padding-bottom:20px;
+}
+
+.grouped-bar-group { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+
+.grouped-bars { display:flex; align-items:flex-end; gap:4px; }
+
+.grouped-bar {
+  width:16px; border-radius:4px 4px 0 0; min-height:4px; transition:height .4s;
+}
+.grouped-bar--2023 { background:#B0C4DE; }
+.grouped-bar--2024 { background:#0E5A9C; }
+
+.report-export { display:flex; gap:12px; flex-wrap:wrap; }
+.btn-outline-sm {
+  padding:9px 16px; border:1px solid #0E5A9C; border-radius:10px;
+  background:#fff; color:#0E5A9C; font-family:'Poppins',sans-serif;
+  font-size:13px; font-weight:600; cursor:pointer; transition:background .2s;
+}
+.btn-outline-sm:hover { background:#EEF4FB; }
+
+@media(max-width:1100px){ .stats-kpi-grid{grid-template-columns:1fr 1fr;} .stats-charts-grid{grid-template-columns:1fr;} }

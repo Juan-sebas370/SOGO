@@ -1,0 +1,7 @@
+@import url('../../shared/styles/form-page.css');
+@import url('../../shared/styles/detail-page.css');
+
+.selector-section {
+  max-width: 560px;
+  margin-bottom: 24px;
+}

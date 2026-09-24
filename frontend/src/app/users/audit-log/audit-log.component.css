@@ -1,0 +1,22 @@
+@import url('../user-list/user-list.component.css');
+@import url('../../tra/tra-reports/tra-reports.component.css');
+
+.report-filters {
+  display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; align-items:flex-end;
+}
+.report-filters .form-field { flex:1; min-width:150px; }
+
+/* Audit action badges */
+.audit-action-badge {
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:12px; font-weight:600; white-space:nowrap;
+}
+.audit-badge--login   { background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE; }
+.audit-badge--logout  { background:#F3F4F6; color:#374151; border:1px solid #D1D5DB; }
+.audit-badge--create  { background:#ECFDF5; color:#166534; border:1px solid #BBF7D0; }
+.audit-badge--block   { background:#FEF2F2; color:#991B1B; border:1px solid #FECACA; }
+.audit-badge--reset   { background:#FFFBEB; color:#92400E; border:1px solid #FDE68A; }
+.audit-badge--change  { background:#EDE9FE; color:#5B21B6; border:1px solid #DDD6FE; }
+
+.font-bold  { font-weight:700; }
+.text-muted { color:#7A7A7A; font-size:13px; }

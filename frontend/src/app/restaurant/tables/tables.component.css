@@ -1,0 +1,110 @@
+@import url('../../shared/styles/list-page.css');
+@import url('../../lodging/lodging-list/lodging-list.component.css');
+
+/* Leyenda */
+.table-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #2B2B2B;
+}
+
+.legend-item { display: flex; align-items: center; gap: 7px; }
+
+.table-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.table-dot--available { background: #23B57B; }
+.table-dot--occupied  { background: #EF4444; }
+.table-dot--reserved  { background: #F59E0B; }
+.table-dot--dirty     { background: #94A3B8; }
+
+/* Grid de mesas */
+.tables-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+/* Tarjeta de mesa */
+.table-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 90px;
+  height: 90px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 2px solid transparent;
+  padding: 8px;
+  text-align: center;
+}
+
+.table-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
+
+.table-card--available { background: #23B57B; border-color: #1A9A68; }
+.table-card--occupied  { background: #EF4444; border-color: #DC2626; }
+.table-card--reserved  { background: #F59E0B; border-color: #D97706; }
+.table-card--dirty     { background: #94A3B8; border-color: #64748B; }
+
+.table-number {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.table-capacity {
+  font-size: 10px;
+  color: rgba(255,255,255,0.85);
+  font-weight: 500;
+}
+
+.table-total {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+.table-status-label {
+  font-size: 9px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal-box {
+  background: #fff; border-radius: 18px; padding: 28px;
+  width: 100%; max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+
+.modal-title { font-family: 'Poppins',sans-serif; font-size: 18px; font-weight: 700; color: #2B2B2B; margin: 0 0 8px; }
+.modal-desc  { font-size: 14px; color: #7A7A7A; margin: 0 0 20px; }
+.modal-field { margin-bottom: 20px; }
+.modal-field label { display: block; font-size: 13px; font-weight: 500; color: #3D3D3D; margin-bottom: 7px; }
+
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; }

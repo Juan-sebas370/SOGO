@@ -1,0 +1,19 @@
+@import url('../payroll-list/payroll-list.component.css');
+@import url('../../billing/invoice-form/invoice-form.component.css');
+
+.preview-summary {
+  display:flex; gap:24px; flex-wrap:wrap;
+  padding:14px 20px; background:#EEF4FB;
+  border-radius:12px; border:1px solid #C8DCF0;
+  margin-bottom:4px;
+  font-family:'Poppins',sans-serif; font-size:14px; color:#2B2B2B;
+}
+.preview-summary strong { color:#0A3D6D; }
+.preview-summary .text-net { color:#166534; }
+
+.total-final-row td { background:#F8F4EE; font-size:14px; padding:12px 16px; border-top:2px solid #E8DCCB !important; }
+.font-bold { font-weight:700; }
+.text-right { text-align:right; }
+
+.btn-approve { background:linear-gradient(90deg,#166534,#22C55E); }
+.btn-approve:hover { background:linear-gradient(90deg,#14532D,#16A34A); }

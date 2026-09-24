@@ -1,0 +1,938 @@
+/* =====================================================
+   DASHBOARD HOME — métricas, ocupación, reservas
+   ===================================================== */
+
+/* Separación vertical entre secciones: la misma que hay entre tarjetas
+   lado a lado (gap: 20px de cada fila), para que ningún recuadro quede
+   pegado al de arriba o abajo. */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Tarjetas de métricas ─────────────────────────── */
+/* Cada KPI representa un concepto distinto (llegadas, salidas, ocupación,
+   reservas, ingresos), así que un color propio por tarjeta ayuda a escanearlas
+   rápido — a diferencia de repetir el mismo color para 5 cosas distintas en
+   widgets separados, que es lo que se evitó en el resto del dashboard. */
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+}
+
+.dash-stat-card {
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 18px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 2px 10px rgba(14,90,156,0.06);
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.dash-stat-card:hover {
+  box-shadow: 0 10px 24px rgba(14,90,156,0.12);
+  transform: translateY(-2px);
+}
+
+.dash-stat-watermark {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  width: 92px;
+  height: auto;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+.dash-stat-icon {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  box-shadow: 0 6px 14px -4px rgba(0,0,0,0.25);
+}
+
+.dash-stat-icon svg {
+  width: 22px; height: 22px;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-stat-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #5A5A5A;
+  line-height: 1.3;
+}
+
+.dash-stat-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #2B2B2B;
+  line-height: 1.2;
+}
+
+.dash-stat-value small {
+  font-size: 15px;
+  font-weight: 500;
+  color: #7A7A7A;
+}
+
+.dash-stat-detail {
+  font-family: 'Poppins', sans-serif;
+  font-size: 11.5px;
+  color: #8A8A8A;
+  margin-top: 2px;
+}
+
+.dash-stat-chevron {
+  position: absolute;
+  right: 16px;
+  bottom: 18px;
+  width: 18px; height: 18px;
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-stat-card--green  .dash-stat-icon { background: linear-gradient(135deg, #34D399, #059669); }
+.dash-stat-card--green  .dash-stat-watermark,
+.dash-stat-card--green  .dash-stat-chevron { fill: #059669; stroke: #059669; color: #059669; }
+
+.dash-stat-card--blue   .dash-stat-icon { background: linear-gradient(135deg, #60A5FA, #2563EB); }
+.dash-stat-card--blue   .dash-stat-watermark,
+.dash-stat-card--blue   .dash-stat-chevron { fill: #2563EB; stroke: #2563EB; color: #2563EB; }
+
+.dash-stat-card--purple .dash-stat-icon { background: linear-gradient(135deg, #A78BFA, #7C3AED); }
+.dash-stat-card--purple .dash-stat-watermark,
+.dash-stat-card--purple .dash-stat-chevron { fill: #7C3AED; stroke: #7C3AED; color: #7C3AED; }
+
+.dash-stat-card--teal   .dash-stat-icon { background: linear-gradient(135deg, #22D3EE, #0E7490); }
+.dash-stat-card--teal   .dash-stat-watermark,
+.dash-stat-card--teal   .dash-stat-chevron { fill: #0E7490; stroke: #0E7490; color: #0E7490; }
+
+.dash-stat-card--amber  .dash-stat-icon { background: linear-gradient(135deg, #FBBF24, #D97706); }
+.dash-stat-card--amber  .dash-stat-watermark,
+.dash-stat-card--amber  .dash-stat-chevron { fill: #D97706; stroke: #D97706; color: #D97706; }
+
+/* ── Filas ────────────────────────────────────────── */
+/* align-items: start evita que una tarjeta con poco contenido se estire
+   para igualar la altura de su vecina y deje un vacío grande abajo. */
+.dash-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.dash-row--bottom {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Estado de habitaciones necesita más ancho: adentro tiene 2 columnas propias
+   (resumen general + desglose por piso). */
+.dash-row--rooms {
+  grid-template-columns: 0.85fr 1.35fr;
+}
+
+/* Agenda / Reservas / Finanzas: las 3 tarjetas con el mismo alto fijo.
+   Cada una reparte su contenido para llenarlo: la agenda hace scroll interno,
+   las reservas estiran sus filas y el gráfico de ingresos crece. */
+.dash-row--triple {
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: stretch;
+}
+
+.dash-row--triple > .dash-card {
+  height: 580px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.dash-row--triple .dash-card-header { flex-shrink: 0; }
+
+.dash-row--triple .dash-timeline,
+.dash-row--triple .dash-reservation-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #E8DCCB transparent;
+}
+
+.dash-row--triple .dash-timeline { padding-right: 6px; }
+
+/* Filas de reservas se estiran para ocupar el alto disponible (sin hueco abajo) */
+.dash-row--triple .dash-reservation { flex: 1 0 auto; }
+
+.dash-row--triple .dash-res-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* El gráfico toma todo el espacio sobrante del resumen financiero */
+.dash-row--triple .dash-chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-row--triple .dash-chart-bars {
+  flex: 1;
+  height: auto;
+  min-height: 90px;
+}
+
+.dash-row--triple .dash-mini-stats { flex-shrink: 0; }
+
+/* ── Tarjeta genérica ─────────────────────────────── */
+/* padding simétrico: antes era 10px arriba vs 26px abajo, así que el
+   contenido quedaba pegado al borde superior de cada tarjeta y con demasiado
+   aire suelto abajo — exactamente la falta de espacio "arriba" que se veía. */
+.dash-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 26px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 2px 8px rgba(14,90,156,0.05);
+}
+
+.dash-card-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 0 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-card-title-icon {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: #FEE2E2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-card-title-icon svg {
+  width: 16px; height: 16px;
+  stroke: #DC2626;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-card-title-icon--blue { background: #DBEAFE; }
+.dash-card-title-icon--blue svg { stroke: #2563EB; }
+.dash-card-title-icon--teal { background: #CCFBF1; }
+.dash-card-title-icon--teal svg { stroke: #0D9488; }
+
+.dash-card-header .dash-card-link { flex-shrink: 0; }
+
+/* ── Donut de ocupación ───────────────────────────── */
+.dash-occ-wrap {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.dash-donut-wrap { flex-shrink: 0; }
+
+.dash-donut {
+  width: 140px;
+  height: 140px;
+}
+
+.dash-occ-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dash-occ-legend li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #2B2B2B;
+}
+
+.dash-occ-legend li strong {
+  margin-left: auto;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: right;
+}
+
+.dash-legend-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Reservas recientes ───────────────────────────── */
+/* Misma tarjetita por fila que "Alertas y pendientes", para que las 3
+   columnas de esta sección se sientan parte de un mismo sistema. */
+.dash-reservation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-reservation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #FAF9F7;
+  border: 1px solid #F1EDE6;
+  border-radius: 14px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dash-reservation:hover { background: #F3F1EC; border-color: #E8DCCB; }
+
+.dash-res-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-res-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #2B2B2B;
+}
+
+.dash-res-room {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+/* Badges */
+.dash-badge {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dash-badge--confirmed { background: #ECFDF5; color: #166534; border: 1px solid #BBF7D0; }
+.dash-badge--pending   { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+
+/* ── Tarjeta métrica ──────────────────────────────── */
+.dash-card--metric { display: flex; flex-direction: column; }
+
+.dash-metric-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 4px 0 12px;
+}
+
+.dash-card-link {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0E5A9C;
+  text-decoration: none;
+  margin-top: auto;
+  transition: color 0.2s;
+}
+
+.dash-card-link:hover { color: #0A3D6D; text-decoration: underline; }
+
+.dash-stat-value--money { font-size: 22px; }
+
+/* ── Estado vacío ─────────────────────────────────── */
+.dash-empty {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  color: #7A7A7A;
+  margin: 8px 0;
+}
+
+/* ── Alertas y pendientes ─────────────────────────── */
+/* Cada fila es su propia tarjetita (fondo, borde, radio) en vez de solo un
+   separador — se lee como una lista de asuntos concretos, no una tabla plana. */
+.dash-alert-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dash-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #FAF9F7;
+  border: 1px solid #F1EDE6;
+  border-radius: 14px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dash-alert-row:hover { background: #F3F1EC; border-color: #E8DCCB; }
+
+.dash-alert-icon {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-alert-icon svg {
+  width: 17px; height: 17px;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Un color por tipo de asunto concreto, no por categoría genérica: así
+   "Check-out pendiente" (urgente) no se ve igual que "Reserva en revisión"
+   (informativo) aunque ambos sean del área de reservas. */
+.dash-alert-icon--checkout    { background: #FEE2E2; }
+.dash-alert-icon--checkout    svg { stroke: #DC2626; }
+.dash-alert-icon--cleaning    { background: #FEF3C7; }
+.dash-alert-icon--cleaning    svg { stroke: #D97706; }
+.dash-alert-icon--maintenance { background: #FFEDD5; }
+.dash-alert-icon--maintenance svg { stroke: #EA580C; }
+.dash-alert-icon--review      { background: #DBEAFE; }
+.dash-alert-icon--review      svg { stroke: #2563EB; }
+.dash-alert-icon--inventory   { background: #DCFCE7; }
+.dash-alert-icon--inventory   svg { stroke: #16A34A; }
+.dash-alert-icon--billing     { background: #CCFBF1; }
+.dash-alert-icon--billing     svg { stroke: #0D9488; }
+
+.dash-alert-label {
+  flex: 1;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  color: #2B2B2B;
+}
+
+.dash-alert-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2B2B2B;
+  min-width: 18px;
+  text-align: right;
+}
+
+.dash-alert-link {
+  color: #0E5A9C;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 2px 4px;
+}
+
+.dash-alert-link:hover { text-decoration: underline; }
+
+/* ── Agenda (llegadas / salidas) ──────────────────── */
+.dash-subcard-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7A7A7A;
+  margin: 20px 0 10px;
+}
+
+.dash-subcard-title:first-of-type { margin-top: 0; }
+
+.dash-agenda-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #2B2B2B;
+}
+
+.dash-agenda-detail {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+/* ── Badges adicionales ───────────────────────────── */
+.dash-badge--waiting   { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+.dash-badge--cancelled { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.dash-badge--finished  { background: #F3F4F6; color: #4B5563; border: 1px solid #E5E7EB; }
+.dash-badge--checkout    { background: #DBEAFE; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.dash-badge--cleaning    { background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; }
+.dash-badge--maintenance { background: #FFEDD5; color: #C2410C; border: 1px solid #FED7AA; }
+
+/* ── Encabezado de tarjeta con contador ───────────── */
+.dash-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.dash-card-header .dash-card-title { margin: 0; }
+
+.dash-card-count {
+  background: #FEF2F2;
+  color: #B91C1C;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-alert-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.dash-alert-detail {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+.dash-priority {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.dash-priority--Alta  { background: #FEE2E2; color: #B91C1C; }
+.dash-priority--Media { background: #FEF3C7; color: #92400E; }
+.dash-priority--Baja  { background: #DBEAFE; color: #1D4ED8; }
+
+/* ── Estado de habitaciones: general (izquierda) + por piso (derecha) ── */
+.dash-rooms-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.dash-rooms-col--floors {
+  padding-left: 20px;
+  border-left: 1px solid #F1EDE6;
+}
+
+.dash-legend-label { flex: 1; }
+
+.dash-legend-chevron {
+  width: 15px; height: 15px;
+  stroke: #B8B0A8;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.dash-floor-block {
+  padding: 14px 0;
+  border-top: 1px solid #F1EDE6;
+}
+
+.dash-floor-block:first-of-type { border-top: none; padding-top: 0; }
+
+.dash-floor-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.dash-floor-name {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2B2B2B;
+}
+
+.dash-floor-count {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+.dash-floor-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #F1EDE6;
+}
+
+.dash-floor-bar span { display: block; height: 100%; }
+
+.dash-floor-caption {
+  margin: 8px 0 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+/* ── Agenda: tabs y tipos ──────────────────────────── */
+/* Pestañas en una sola línea (antes "Mantenimiento" bajaba a otra fila y
+   robaba alto a la lista); si no caben, scroll horizontal. */
+.dash-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.dash-tabs::-webkit-scrollbar { display: none; }
+
+.dash-tab {
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid #E8DCCB;
+  background: #fff;
+  color: #7A7A7A;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.dash-tab.active {
+  background: #0E5A9C;
+  border-color: #0E5A9C;
+  color: #fff;
+}
+
+/* Línea de tiempo: reemplaza la hora exacta (que no existe en los datos para
+   check-in/check-out programados, y no aplica en absoluto a limpieza/
+   mantenimiento) por la fecha real cuando existe, o "Ahora" cuando el ítem es
+   simplemente el estado actual de una habitación. */
+.dash-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-timeline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #F1EDE6;
+  position: relative;
+}
+
+.dash-timeline-row:first-child { border-top: none; padding-top: 0; }
+
+.dash-timeline-when {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 44px;
+  flex-shrink: 0;
+}
+
+.dash-timeline-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dash-timeline-dot--Llegada      { background: #16A34A; }
+.dash-timeline-dot--Salida       { background: #2563EB; }
+.dash-timeline-dot--Limpieza     { background: #D97706; }
+.dash-timeline-dot--Mantenimiento{ background: #EA580C; }
+
+.dash-timeline-date {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #7A7A7A;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.dash-agenda-type {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.dash-agenda-type--Llegada      { background: #ECFDF5; color: #16A34A; }
+.dash-agenda-type--Salida       { background: #EFF6FF; color: #2563EB; }
+.dash-agenda-type--Limpieza     { background: #FEF3C7; color: #D97706; }
+.dash-agenda-type--Mantenimiento{ background: #FFEDD5; color: #EA580C; }
+
+.dash-agenda-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ── Gráfico de ingresos ──────────────────────────── */
+.dash-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 120px;
+  padding-top: 8px;
+}
+
+.dash-chart-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.dash-chart-bar {
+  width: 100%;
+  max-width: 28px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, #0E5A9C, #0A3D6D);
+  margin-top: auto;
+}
+
+.dash-chart-label {
+  margin-top: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 10.5px;
+  color: #7A7A7A;
+}
+
+.dash-chart-caption {
+  margin: 10px 0 0;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: #7A7A7A;
+}
+
+/* ── Resumen financiero: cifra principal ───────────── */
+.dash-finance-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 16px;
+}
+
+.dash-finance-amount {
+  font-family: 'Poppins', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #2B2B2B;
+}
+
+.dash-finance-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 12.5px;
+  color: #7A7A7A;
+}
+
+/* ── Mini estadísticas financieras ─────────────────── */
+.dash-mini-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.dash-mini-stat {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #FBF9F5;
+  border: 1px solid #F1EDE6;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.dash-mini-icon {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dash-mini-icon svg {
+  width: 13px; height: 13px;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.dash-mini-icon--purple { background: #F5F3FF; }
+.dash-mini-icon--purple svg { stroke: #7C3AED; }
+.dash-mini-icon--green  { background: #DCFCE7; }
+.dash-mini-icon--green  svg { stroke: #16A34A; }
+.dash-mini-icon--amber  { background: #FEF3C7; }
+.dash-mini-icon--amber  svg { stroke: #D97706; }
+.dash-mini-icon--red    { background: #FEE2E2; }
+.dash-mini-icon--red    svg { stroke: #DC2626; }
+
+.dash-mini-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dash-mini-label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 10.5px;
+  color: #7A7A7A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-mini-value {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2B2B2B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Acciones rápidas ─────────────────────────────── */
+.dash-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 20px;
+}
+
+.dash-quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 14px;
+  border-radius: 16px;
+  border: 1px solid #E8DCCB;
+  background: #FBF9F5;
+  color: #0A3D6D;
+  text-decoration: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.dash-quick-action:hover {
+  background: #F3F6FB;
+  transform: translateY(-2px);
+}
+
+.dash-quick-action svg {
+  width: 22px; height: 22px;
+  stroke: #0E5A9C;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ── Responsive ───────────────────────────────────── */
+@media (max-width: 1400px) {
+  .dash-row--triple { grid-template-columns: 1fr; }
+  /* Apiladas en una columna ya no hay vecinas que igualar */
+  .dash-row--triple > .dash-card { height: auto; }
+  .dash-row--triple .dash-timeline { max-height: 420px; }
+  .dash-row--triple .dash-reservation { flex: none; }
+  .dash-row--triple .dash-chart-bars { flex: none; height: 140px; }
+}
+
+@media (max-width: 1200px) {
+  .dash-stats { grid-template-columns: repeat(3, 1fr); }
+  .dash-quick-actions { grid-template-columns: repeat(3, 1fr); }
+  .dash-row--rooms { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 900px) {
+  .dash-rooms-grid { grid-template-columns: 1fr; }
+  .dash-rooms-col--floors {
+    padding-left: 0;
+    padding-top: 20px;
+    border-left: none;
+    border-top: 1px solid #F1EDE6;
+  }
+}
+
+@media (max-width: 768px) {
+  .dash-stats, .dash-row, .dash-row--bottom { grid-template-columns: 1fr; }
+  .dash-quick-actions { grid-template-columns: 1fr 1fr; }
+  .dash-mini-stats { grid-template-columns: 1fr; }
+}

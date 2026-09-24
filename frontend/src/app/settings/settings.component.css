@@ -1,0 +1,269 @@
+/* =====================================================
+   CONFIGURACIÓN — paleta SOGO
+   ===================================================== */
+@import url('../shared/styles/form-page.css');
+@import url('../users/user-list/user-list.component.css');
+@import url('../billing/invoice-form/invoice-form.component.css');
+
+/* ── Layout ───────────────────────────────────────── */
+.settings-page {}
+
+.settings-layout {
+  display:grid;
+  grid-template-columns:220px 1fr;
+  gap:24px;
+  margin-top:20px;
+  align-items:start;
+}
+
+/* ── Menú lateral ─────────────────────────────────── */
+.settings-nav {
+  background:#fff;
+  border-radius:14px;
+  border:1px solid #E8DCCB;
+  padding:8px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  box-shadow:0 2px 8px rgba(14,90,156,.05);
+  position:sticky;
+  top:80px;
+}
+
+.settings-nav-item {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:11px 14px;
+  border-radius:10px;
+  border:none;
+  background:transparent;
+  font-family:'Poppins',sans-serif;
+  font-size:13.5px;
+  font-weight:500;
+  color:#7A7A7A;
+  cursor:pointer;
+  text-align:left;
+  transition:background .18s, color .18s;
+}
+
+.settings-nav-item:hover {
+  background:#F8F4EE;
+  color:#0A3D6D;
+}
+
+.settings-nav-item.active {
+  background:#EEF4FB;
+  color:#0A3D6D;
+  font-weight:700;
+  border-left:3px solid #0E5A9C;
+}
+
+.snav-icon  { font-size:16px; flex-shrink:0; }
+.snav-label { flex:1; }
+
+/* ── Contenido ────────────────────────────────────── */
+.settings-content {
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+
+.settings-section-title {
+  font-family:'Poppins',sans-serif;
+  font-size:18px;
+  font-weight:700;
+  color:#0A3D6D;
+  margin:0 0 16px;
+  padding-bottom:12px;
+  border-bottom:2px solid #E8DCCB;
+}
+
+/* ── Grupos ───────────────────────────────────────── */
+.settings-group {
+  background:#fff;
+  border-radius:14px;
+  padding:22px;
+  border:1px solid #E8DCCB;
+  box-shadow:0 2px 8px rgba(14,90,156,.05);
+  margin-bottom:0;
+}
+
+.settings-group-title {
+  font-family:'Poppins',sans-serif;
+  font-size:14px;
+  font-weight:700;
+  color:#2B2B2B;
+  margin:0 0 18px;
+  padding-bottom:10px;
+  border-bottom:1px solid #F1EDE6;
+}
+
+/* ── Form grid ────────────────────────────────────── */
+.settings-form-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+
+/* ── Logo ─────────────────────────────────────────── */
+.logo-upload-area {
+  display:flex;
+  align-items:center;
+  gap:20px;
+  padding:16px;
+  background:#F8F4EE;
+  border-radius:12px;
+  border:1px solid #E8DCCB;
+}
+
+.logo-preview {
+  width:120px;
+  height:auto;
+  object-fit:contain;
+  flex-shrink:0;
+}
+
+.logo-name { font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; color:#2B2B2B; margin:0 0 4px; }
+.logo-desc { font-size:12px; color:#7A7A7A; margin:0 0 12px; line-height:1.5; }
+
+/* ── Room types ───────────────────────────────────── */
+.room-types-list { display:flex; flex-direction:column; gap:10px; }
+
+.room-type-item {
+  display:grid;
+  grid-template-columns:2fr 1fr 1.5fr 32px;
+  gap:10px;
+  align-items:center;
+}
+
+/* ── Payment methods ──────────────────────────────── */
+.payment-methods {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+
+.checkbox-label {
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  font-family:'Poppins',sans-serif; font-size:14px; color:#2B2B2B;
+  padding:10px 14px; background:#F8F4EE; border-radius:10px;
+  border:1px solid #E8DCCB; transition:background .2s;
+}
+.checkbox-label:hover { background:#EDE7DC; }
+.checkbox-label input[type="checkbox"] { width:17px; height:17px; accent-color:#0E5A9C; }
+
+/* ── Notification events ──────────────────────────── */
+.notif-events { display:flex; flex-direction:column; gap:0; }
+
+.notif-event-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:13px 0;
+  border-bottom:1px dotted #E8DCCB;
+  cursor:pointer;
+}
+.notif-event-row:last-child { border-bottom:none; }
+
+.notif-event-info { display:flex; flex-direction:column; gap:2px; }
+.notif-event-name { font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; color:#2B2B2B; }
+.notif-event-desc { font-size:12px; color:#7A7A7A; }
+
+.notif-toggles { display:flex; gap:16px; flex-shrink:0; }
+.toggle-label {
+  display:flex; align-items:center; gap:6px;
+  font-family:'Poppins',sans-serif; font-size:13px; color:#7A7A7A; cursor:pointer;
+}
+.toggle-label input[type="checkbox"] { width:16px; height:16px; accent-color:#0E5A9C; }
+
+/* ── Security toggles ─────────────────────────────── */
+.security-toggles { display:flex; flex-direction:column; gap:0; margin-top:16px; }
+
+.toggle-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:14px 0;
+  border-bottom:1px dotted #E8DCCB;
+  cursor:pointer;
+}
+.toggle-row:last-child { border-bottom:none; }
+
+.toggle-row div { max-width:80%; }
+.toggle-row strong { font-family:'Poppins',sans-serif; font-size:14px; font-weight:600; color:#2B2B2B; }
+.toggle-row p { font-size:12px; color:#7A7A7A; margin:3px 0 0; }
+
+.toggle-check { width:20px; height:20px; accent-color:#0E5A9C; cursor:pointer; flex-shrink:0; }
+
+/* ── Backup ───────────────────────────────────────── */
+.backup-section { display:flex; flex-direction:column; gap:12px; }
+.backup-info    { display:flex; align-items:center; gap:12px; }
+.backup-label   { font-size:13px; color:#7A7A7A; font-weight:500; min-width:160px; }
+.backup-value   { font-size:14px; font-weight:700; color:#0A3D6D; }
+
+/* ── Integrations ─────────────────────────────────── */
+.integrations-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:16px;
+}
+
+.integration-card {
+  background:#fff;
+  border-radius:14px;
+  padding:20px;
+  border:1px solid #E8DCCB;
+  box-shadow:0 2px 8px rgba(14,90,156,.05);
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+  transition:box-shadow .2s;
+}
+.integration-card:hover { box-shadow:0 6px 18px rgba(14,90,156,.10); }
+
+.integ-header {
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+}
+
+.integ-icon  { font-size:28px; flex-shrink:0; }
+.integ-name  { font-family:'Poppins',sans-serif; font-size:14px; font-weight:700; color:#0A3D6D; display:block; }
+.integ-desc  { font-size:12px; color:#7A7A7A; margin:3px 0 0; line-height:1.4; }
+
+.integ-header .res-badge { margin-left:auto; flex-shrink:0; }
+
+.integ-body {}
+
+.integ-actions { display:flex; gap:10px; }
+
+/* ── Toast ────────────────────────────────────────── */
+.toast-success {
+  position:fixed; bottom:24px; right:24px;
+  background:#ECFDF5; color:#166534; border:1px solid #BBF7D0;
+  padding:14px 22px; border-radius:12px;
+  font-family:'Poppins',sans-serif; font-size:14px; font-weight:600;
+  box-shadow:0 8px 20px rgba(22,101,52,.15);
+  animation:fadeInToast .3s ease;
+  z-index:999;
+}
+
+@keyframes fadeInToast {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── Responsive ───────────────────────────────────── */
+@media(max-width:1100px) {
+  .settings-layout         { grid-template-columns:1fr; }
+  .settings-nav            { flex-direction:row; flex-wrap:wrap; position:static; }
+  .settings-form-grid      { grid-template-columns:1fr; }
+  .integrations-grid       { grid-template-columns:1fr; }
+  .payment-methods         { grid-template-columns:1fr 1fr; }
+}
+
+@media(max-width:768px) {
+  .payment-methods         { grid-template-columns:1fr; }
+  .room-type-item          { grid-template-columns:1fr 1fr 1fr 32px; }
+}

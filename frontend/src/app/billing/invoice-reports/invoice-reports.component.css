@@ -1,0 +1,15 @@
+@import url('../../tra/tra-reports/tra-reports.component.css');
+
+.chart-card--wide { grid-column: 1 / 2; }
+
+.bar-chart--tall { height: 140px; }
+
+.report-stat-card--highlight {
+  background: linear-gradient(135deg, #EEF4FB, #D8E8F5);
+  border-color: #C8DCF0;
+}
+
+.stat-value--income {
+  font-size: 22px;
+  color: #0A3D6D;
+}

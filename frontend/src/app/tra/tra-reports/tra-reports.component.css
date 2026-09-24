@@ -1,0 +1,153 @@
+@import url('../../shared/styles/form-page.css');
+@import url('../tra-list/tra-list.component.css');
+
+.report-filters {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.report-filters .form-field { flex: 1; min-width: 160px; }
+
+/* Métricas */
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.report-stat-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 2px 8px rgba(14,90,156,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7A7A7A;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0A3D6D;
+  line-height: 1;
+}
+
+/* Gráficos */
+.report-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 2px 8px rgba(14,90,156,0.05);
+}
+
+.chart-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 0 0 20px;
+}
+
+/* Barras */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 120px;
+  padding-bottom: 24px;
+  position: relative;
+}
+
+.bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.bar {
+  width: 100%;
+  max-width: 32px;
+  border-radius: 6px 6px 0 0;
+  transition: opacity 0.2s;
+}
+
+.bar:hover { opacity: 0.8; }
+
+.bar-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin-top: -20px;
+}
+
+.bar-label {
+  font-size: 10px;
+  color: #7A7A7A;
+  white-space: nowrap;
+}
+
+/* Donut */
+.donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.donut-svg { width: 120px; height: 120px; flex-shrink: 0; }
+
+.donut-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #2B2B2B;
+}
+
+.donut-legend li strong { margin-left: 4px; font-weight: 700; }
+
+.legend-dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Exportar */
+.report-export {
+  display: flex;
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .report-stats  { grid-template-columns: 1fr 1fr; }
+  .report-charts { grid-template-columns: 1fr; }
+}

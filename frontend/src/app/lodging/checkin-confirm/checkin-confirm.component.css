@@ -1,0 +1,121 @@
+@import url('../../shared/styles/list-page.css');
+
+.confirm-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.confirm-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 48px 44px;
+  border: 1px solid #E8DCCB;
+  box-shadow: 0 4px 24px rgba(14,90,156,0.08);
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.confirm-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: #ECFDF5;
+  border: 2px solid #BBF7D0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.confirm-icon svg {
+  width: 36px; height: 36px;
+  stroke: #16A34A; fill: none;
+  stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.confirm-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #2B2B2B;
+  margin: 0 0 8px;
+}
+
+.confirm-desc {
+  font-size: 14px;
+  color: #7A7A7A;
+  margin: 0 0 28px;
+  line-height: 1.6;
+}
+
+.confirm-summary {
+  background: #F8F4EE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 28px;
+  text-align: left;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #EDE7DC;
+}
+
+.summary-row:last-child { border-bottom: none; }
+
+.summary-label {
+  font-size: 13px;
+  color: #7A7A7A;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 13px;
+  color: #2B2B2B;
+  font-weight: 600;
+  text-align: right;
+}
+
+.summary-value--highlight {
+  font-size: 16px;
+  color: #0A3D6D;
+  font-weight: 700;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  background: #fff;
+  color: #2B2B2B;
+  border: 1px solid #E8DCCB;
+  border-radius: 10px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-outline:hover { background: #F8F4EE; }
+
+.btn-outline svg {
+  width: 15px; height: 15px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}

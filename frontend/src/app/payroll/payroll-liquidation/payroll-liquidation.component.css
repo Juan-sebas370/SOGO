@@ -1,0 +1,59 @@
+@import url('../../shared/styles/detail-page.css');
+@import url('../../lodging/lodging-list/lodging-list.component.css');
+@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../payroll-list/payroll-list.component.css');
+
+/* Métricas rápidas */
+.liq-metrics {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  margin-bottom:20px;
+}
+
+.liq-metric-card {
+  background:#fff;
+  border-radius:14px;
+  padding:18px 20px;
+  border:1px solid #E8DCCB;
+  box-shadow:0 2px 8px rgba(14,90,156,.05);
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+
+.liq-metric-card--earnings { background:linear-gradient(135deg,#EEF4FB,#D8E8F5); border-color:#C8DCF0; }
+.liq-metric-card--deductions{ background:linear-gradient(135deg,#FEF2F2,#FECACA20); border-color:#FECACA; }
+.liq-metric-card--net       { background:linear-gradient(135deg,#ECFDF5,#BBF7D020); border-color:#BBF7D0; }
+
+.metric-icon { font-size:28px; flex-shrink:0; }
+.metric-label{ font-size:12px; color:#7A7A7A; font-weight:500; display:block; }
+.metric-value{ font-size:24px; font-weight:800; color:#0A3D6D; display:block; line-height:1.1; }
+.metric-value--net { color:#166534; }
+.metric-sub  { font-size:11px; color:#7A7A7A; }
+
+/* Tab content */
+.liq-tab-content { margin-top:16px; }
+.liq-content-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:20px; }
+
+.total-final-row td { background:#F8F4EE; font-size:14px; padding:12px 16px; border-top:2px solid #E8DCCB !important; }
+
+/* Acciones */
+.liq-actions {
+  display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;
+  padding-top:20px; border-top:1px solid #E8DCCB;
+}
+
+.btn-outline {
+  display:inline-flex; align-items:center; gap:7px;
+  padding:10px 18px; background:#fff; color:#2B2B2B;
+  border:1px solid #E8DCCB; border-radius:10px;
+  font-family:'Poppins',sans-serif; font-size:14px; font-weight:500;
+  cursor:pointer; transition:background .2s;
+}
+.btn-outline:hover { background:#F8F4EE; }
+
+.font-bold { font-weight:700; }
+.text-right { text-align:right; }
+
+@media(max-width:900px){ .liq-metrics{ grid-template-columns:1fr 1fr; } .liq-content-grid{ grid-template-columns:1fr; } }

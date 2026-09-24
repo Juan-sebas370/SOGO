@@ -1,0 +1,11 @@
+com\sogo\config\OAuth2ClientConfig.class
+com\sogo\controller\ProtectedController.class
+com\sogo\SogoApplication.class
+com\sogo\config\CorsConfig$1.class
+com\sogo\config\SecurityConfig.class
+com\sogo\security\OAuth2SuccessHandler.class
+com\sogo\controller\AuthController.class
+com\sogo\config\CorsConfig.class
+com\sogo\service\UserService.class
+com\sogo\model\User.class
+com\sogo\security\JwtUtil.class

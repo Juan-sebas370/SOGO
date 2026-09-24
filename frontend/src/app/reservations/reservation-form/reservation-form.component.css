@@ -113,6 +113,15 @@
   color: #374151;
 }
 
+.rsv-form-total {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0A2540;
+}
+
 /* Resumen */
 .rsv-summary {
   display: flex;

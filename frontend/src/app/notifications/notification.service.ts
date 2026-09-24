@@ -45,7 +45,7 @@ export class NotificationService {
     const invoiceStats = this.invoiceService.getStats();
     const departuresCount = this.stayService.getDepartures().length;
     const pendingReservations = this.reservations.filter(r => r.status === 'Pendiente').length;
-    const traPending = this.reservations.filter(r => r.status === 'Confirmada' && r.traStatus === 'Pendiente').length;
+    const traPending = this.reservations.filter(r => r.status === 'Confirmada' && this.reservationService.traStatus(r) === 'Pendiente').length;
     const cleaningRooms = this.rooms.filter(r => r.status === 'En limpieza');
     const maintenanceRooms = this.rooms.filter(r => r.status === 'Mantenimiento');
 

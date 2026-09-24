@@ -1,17 +1,52 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { Tra, TraStatus } from './tra.model';
+import { Tra } from './tra.model';
+import { isoDate } from '../shared/date-utils';
+
+type TraSeed = Pick<Tra, 'fullName' | 'docNumber' | 'firstName' | 'lastName' | 'cityOfResidence' | 'travelReason' | 'transport'
+  | 'roomNumber' | 'roomType' | 'nights' | 'guests' | 'age' | 'status' | 'observations'> & { res: number; inOffset: number };
+
+// Cada TRA apunta a una reserva real de ReservationService (RSV-<año>-00108…),
+// con el mismo huésped, habitaciones y fechas relativas a hoy. De aquí sale el
+// estado "TRA" que muestran el listado y el detalle de reservas.
+function seed(): Tra[] {
+  const year = new Date().getFullYear();
+  const rows: TraSeed[] = [
+    { res: 118, inOffset: 0,   fullName: 'Juan Sebastián Pinilla', docNumber: '1120405060', firstName: 'Juan Sebastián', lastName: 'Pinilla',  cityOfResidence: 'Armenia',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '102, 104', roomType: '2 habitaciones', nights: 2, guests: 4,  age: '31', status: 'Pendiente', observations: 'Falta registrar acompañantes.' },
+    { res: 117, inOffset: -1,  fullName: 'Diego Ramírez',          docNumber: '1110304050', firstName: 'Diego',          lastName: 'Ramírez',  cityOfResidence: 'Pereira',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '301',      roomType: 'Hab. 301',       nights: 3, guests: 3,  age: '38', status: 'Generada',  observations: '' },
+    { res: 116, inOffset: -2,  fullName: 'Laura Torres',           docNumber: '1100203040', firstName: 'Laura',          lastName: 'Torres',   cityOfResidence: 'Bucaramanga', travelReason: 'Negocios', transport: 'Aéreo',     roomNumber: '203',      roomType: 'Hab. 203',       nights: 3, guests: 2,  age: '29', status: 'Generada',  observations: '' },
+    { res: 111, inOffset: -9,  fullName: 'Diana Pérez',            docNumber: '1050607080', firstName: 'Diana',          lastName: 'Pérez',    cityOfResidence: 'Medellín',    travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '102, 104, 105, 106', roomType: 'Piso 1', nights: 2, guests: 5,  age: '42', status: 'Generada',  observations: '' },
+    { res: 110, inOffset: -12, fullName: 'Jorge Martínez',         docNumber: '1040506070', firstName: 'Jorge',          lastName: 'Martínez', cityOfResidence: 'Cali',        travelReason: 'Negocios', transport: 'Aéreo',     roomNumber: '105',      roomType: 'Hab. 105',       nights: 2, guests: 1,  age: '35', status: 'Generada',  observations: '' },
+    { res: 109, inOffset: -15, fullName: 'Andrés Villa',           docNumber: '1030405060', firstName: 'Andrés',         lastName: 'Villa',    cityOfResidence: 'Bogotá',      travelReason: 'Negocios', transport: 'Terrestre', roomNumber: '201, 203, 301', roomType: 'Piso 2',   nights: 2, guests: 5,  age: '45', status: 'Generada',  observations: '' },
+    { res: 108, inOffset: -20, fullName: 'Valentina Castro',       docNumber: '1020304050', firstName: 'Valentina',      lastName: 'Castro',   cityOfResidence: 'Pereira',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: 'P1 + P2',  roomType: 'Casa completa',  nights: 2, guests: 18, age: '40', status: 'Generada',  observations: 'Grupo familiar.' },
+  ];
+  return rows.map(({ res, inOffset, ...t }, i) => ({
+    ...t,
+    id: String(i + 1),
+    code: `TRA-${String(851 - i).padStart(5, '0')}`,
+    reservationCode: `RSV-${year}-${String(res).padStart(5, '0')}`,
+    docType: 'Cédula de Ciudadanía',
+    nationality: 'Colombiana',
+    birthDate: `${year - Number(t.age)}-03-15`,
+    countryOfResidence: 'Colombia',
+    company: '',
+    checkInDate: isoDate(inOffset),
+    checkInTime: '15:00',
+    checkOutDate: isoDate(inOffset + t.nights),
+    checkOutTime: '11:00',
+    plan: 'Desayuno incluido',
+    travelPurpose: t.travelReason,
+    residenceCountry: 'Colombia',
+    generatedAt: `${isoDate(inOffset)}T15:20`,
+    generatedBy: 'Administrador',
+  }));
+}
 
 @Injectable({ providedIn: 'root' })
 export class TraService {
 
-  private data: Tra[] = [
-    { id:'1', code:'TRA-00845', reservationCode:'RES-00078', fullName:'María López García',  docType:'Cédula de Ciudadanía', docNumber:'1234567890', firstName:'María',    lastName:'López García', nationality:'Colombiana', birthDate:'1990-03-15', countryOfResidence:'Colombia', cityOfResidence:'Armenia',  travelReason:'Turismo',  transport:'Aéreo', company:'AV123', roomNumber:'102', roomType:'102 - Doble Estándar', checkInDate:'2024-05-24', checkInTime:'14:30', checkOutDate:'2024-05-26', checkOutTime:'11:15', nights:2, guests:2, plan:'Desayuno incluido', travelPurpose:'Turismo', residenceCountry:'Colombia', age:'34', status:'Generada',  observations:'Llegada en la tarde. Prefiere habitación tranquila.', generatedAt:'2024-05-24T14:30', generatedBy:'Administrador' },
-    { id:'2', code:'TRA-00844', reservationCode:'RES-00077', fullName:'Juan Pérez',           docType:'Cédula de Ciudadanía', docNumber:'9876543210', firstName:'Juan',      lastName:'Pérez',        nationality:'Colombiana', birthDate:'1985-07-22', countryOfResidence:'Colombia', cityOfResidence:'Bogotá',   travelReason:'Negocios', transport:'Terrestre', company:'',    roomNumber:'203', roomType:'203 - Suite',          checkInDate:'2024-05-24', checkInTime:'11:00', checkOutDate:'2024-05-25', checkOutTime:'10:00', nights:1, guests:1, plan:'Solo alojamiento', travelPurpose:'Negocios', residenceCountry:'Colombia', age:'39', status:'Generada',  observations:'',                                                    generatedAt:'2024-05-24T11:00', generatedBy:'Administrador' },
-    { id:'3', code:'TRA-00843', reservationCode:'RES-00076', fullName:'Ana Gómez',            docType:'Cédula de Ciudadanía', docNumber:'1122334455', firstName:'Ana',       lastName:'Gómez',        nationality:'Colombiana', birthDate:'1995-11-08', countryOfResidence:'Colombia', cityOfResidence:'Medellín', travelReason:'Turismo',  transport:'Terrestre', company:'',    roomNumber:'105', roomType:'105 - Simple',         checkInDate:'2024-05-25', checkInTime:'15:00', checkOutDate:'2024-05-27', checkOutTime:'11:00', nights:2, guests:1, plan:'Desayuno incluido', travelPurpose:'Turismo', residenceCountry:'Colombia', age:'29', status:'Generada',  observations:'Solicita piso alto.',                                 generatedAt:'2024-05-25T15:00', generatedBy:'Administrador' },
-    { id:'4', code:'TRA-00842', reservationCode:'RES-00075', fullName:'Carlos Ruiz',          docType:'Pasaporte',            docNumber:'AB123456',   firstName:'Carlos',    lastName:'Ruiz',         nationality:'Mexicana',   birthDate:'1980-04-30', countryOfResidence:'México',   cityOfResidence:'CDMX',     travelReason:'Turismo',  transport:'Aéreo', company:'AM456', roomNumber:'201', roomType:'201 - Doble Estándar', checkInDate:'2024-05-26', checkInTime:'13:00', checkOutDate:'2024-05-28', checkOutTime:'12:00', nights:2, guests:2, plan:'Todo incluido',     travelPurpose:'Turismo', residenceCountry:'México',   age:'44', status:'Generada',  observations:'',                                                    generatedAt:'2024-05-26T13:00', generatedBy:'Administrador' },
-    { id:'5', code:'TRA-00841', reservationCode:'RES-00074', fullName:'Luisa Martínez',       docType:'Cédula de Ciudadanía', docNumber:'5566778899', firstName:'Luisa',     lastName:'Martínez',     nationality:'Colombiana', birthDate:'1992-09-14', countryOfResidence:'Colombia', cityOfResidence:'Cali',     travelReason:'Turismo',  transport:'Terrestre', company:'',    roomNumber:'104', roomType:'104 - Doble Estándar', checkInDate:'2024-05-27', checkInTime:'16:00', checkOutDate:'2024-05-29', checkOutTime:'11:00', nights:2, guests:2, plan:'Desayuno incluido', travelPurpose:'Turismo', residenceCountry:'Colombia', age:'32', status:'Pendiente', observations:'',                                                    generatedAt:'2024-05-27T16:00', generatedBy:'Administrador' },
-  ];
+  private data: Tra[] = seed();
+
 
   private tras$ = new BehaviorSubject<Tra[]>(this.data);
 
@@ -19,7 +54,7 @@ export class TraService {
   getById(id: string): Tra | undefined { return this.data.find(t => t.id === id); }
 
   create(t: Omit<Tra, 'id' | 'code' | 'generatedAt'>): Tra {
-    const next = this.data.length + 841;
+    const next = Math.max(0, ...this.data.map(x => Number(x.code.split('-').pop()))) + 1;
     const newT: Tra = {
       ...t,
       id: String(Date.now()),

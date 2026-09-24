@@ -12,6 +12,14 @@ export function fmtDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+/** YYYY-MM-DDTHH:mm → "24/09/2026 10:32 a. m." */
+export function fmtDateTime(iso: string): string {
+  const [date, time] = iso.slice(0, 16).split('T');
+  if (!time) return fmtDate(date);
+  const [h, m] = time.split(':').map(Number);
+  return `${fmtDate(date)} ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'a. m.' : 'p. m.'}`;
+}
+
 /** YYYY-MM-DD → "25 sep" */
 export function fmtShortDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);

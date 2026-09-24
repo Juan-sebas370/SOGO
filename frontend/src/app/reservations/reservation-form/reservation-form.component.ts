@@ -4,13 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
-  Reservation, ReservationType, LodgingType, ReservationStatus, ReservationTraStatus, paymentStatus, isVoid
+  Reservation, ReservationType, LodgingType, ReservationStatus, PaymentMethod, PaymentStatus, isVoid
 } from '../reservation.model';
 import { fmtDate, fmtMoney, paymentBadge } from '../reservation-format';
 import { RoomService } from '../../lodging/room.service';
 import { Room } from '../../lodging/room.model';
 
-type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt'>;
+type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
 
 @Component({
   selector: 'app-reservation-form',
@@ -62,6 +62,10 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt'>;
           <label for="email">Correo electrónico</label>
           <input id="email" type="email" class="rsv-input" [(ngModel)]="d.email" placeholder="correo@ejemplo.com">
         </div>
+      </div>
+      <div class="rsv-field">
+        <label for="city">Ciudad / Departamento</label>
+        <input id="city" type="text" class="rsv-input" [(ngModel)]="d.city" placeholder="Colombia - Armenia, Quindío">
       </div>
       <div class="rsv-field">
         <label for="obs">Observaciones</label>
@@ -153,12 +157,12 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt'>;
       <h2 class="rsv-form-title">Pago y estado</h2>
       <div class="rsv-form-row rsv-form-row--4">
         <div class="rsv-field">
-          <label for="total">Valor total (COP) *</label>
-          <input id="total" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.totalAmount">
+          <label for="lodgingAmount">Valor alojamiento (COP) *</label>
+          <input id="lodgingAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.lodgingAmount">
         </div>
         <div class="rsv-field">
-          <label for="paid">Valor abonado (COP)</label>
-          <input id="paid" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.paidAmount">
+          <label for="extrasAmount">Servicios adicionales (COP)</label>
+          <input id="extrasAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.extrasAmount">
         </div>
         <div class="rsv-field">
           <label for="status">Estado</label>
@@ -167,10 +171,26 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt'>;
           </select>
         </div>
         <div class="rsv-field">
-          <label for="tra">TRA</label>
-          <select id="tra" class="rsv-input" [(ngModel)]="d.traStatus">
-            <option *ngFor="let o of traOptions">{{ o }}</option>
+          <label>Total</label>
+          <span class="rsv-form-total">{{ money(total) }}</span>
+        </div>
+      </div>
+
+      <!-- Abono inicial: solo al crear. Los pagos siguientes se registran desde el detalle. -->
+      <div class="rsv-form-row rsv-form-row--3" *ngIf="!isEdit">
+        <div class="rsv-field">
+          <label for="payAmount">Abono inicial (COP)</label>
+          <input id="payAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="firstPayment.amount">
+        </div>
+        <div class="rsv-field">
+          <label for="payMethod">Método de pago</label>
+          <select id="payMethod" class="rsv-input" [(ngModel)]="firstPayment.method" [disabled]="!firstPayment.amount">
+            <option *ngFor="let o of paymentMethods">{{ o }}</option>
           </select>
+        </div>
+        <div class="rsv-field">
+          <label for="payReceipt">N.º de comprobante</label>
+          <input id="payReceipt" type="text" class="rsv-input" [(ngModel)]="firstPayment.receipt" [disabled]="!firstPayment.amount" placeholder="1234">
         </div>
       </div>
 
@@ -178,7 +198,8 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt'>;
         <span><strong>{{ d.nights }}</strong> noche{{ d.nights === 1 ? '' : 's' }}</span>
         <span><strong>{{ guestsTotal }}</strong> huésped{{ guestsTotal === 1 ? '' : 'es' }} · capacidad {{ capacity }}</span>
         <span><strong>{{ d.rooms.length }}</strong> habitación{{ d.rooms.length === 1 ? '' : 'es' }}</span>
-        <span>Saldo <strong>{{ money(balance) }}</strong></span>
+        <span>Pagado <strong>{{ money(paid) }}</strong></span>
+        <span>Saldo <strong>{{ money(pending) }}</strong></span>
         <span class="rsv-badge" [ngClass]="paymentBadge(pay)">{{ pay }}</span>
       </div>
       <p class="rsv-form-warn" *ngIf="guestsTotal > capacity">
@@ -205,7 +226,7 @@ export class ReservationFormComponent implements OnInit {
   // Finalizada / Cancelada / No presentada no se asignan a mano desde aquí:
   // salen del flujo de alojamiento o de la acción "Cancelar reserva".
   readonly statusOptions: ReservationStatus[] = ['Pendiente', 'Confirmada'];
-  readonly traOptions: ReservationTraStatus[] = ['Pendiente', 'Completa', 'No aplica'];
+  readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
   readonly plans = ['Solo alojamiento', 'Desayuno incluido', 'Media pensión', 'Todo incluido'];
 
   readonly money = fmtMoney;
@@ -219,14 +240,16 @@ export class ReservationFormComponent implements OnInit {
   floors: number[] = [];
 
   d: Draft = {
-    guestName: '', docType: 'Cédula de Ciudadanía', docNumber: '', phone: '', email: '',
+    guestName: '', docType: 'Cédula de Ciudadanía', docNumber: '', phone: '', email: '', city: '',
     reservationType: 'Individual', lodgingType: 'Habitación', rooms: [],
     adults: 1, children: 0, infants: 0,
     checkIn: '', checkOut: '', nights: 0,
     plan: 'Desayuno incluido',
-    totalAmount: 0, paidAmount: 0,
-    status: 'Pendiente', traStatus: 'Pendiente', observations: ''
+    lodgingAmount: 0, extrasAmount: 0, payments: [],
+    status: 'Pendiente', observations: ''
   };
+
+  firstPayment: { amount: number; method: PaymentMethod; receipt: string } = { amount: 0, method: 'Efectivo', receipt: '' };
 
   constructor(
     private svc: ReservationService,
@@ -242,7 +265,7 @@ export class ReservationFormComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     const found = id ? this.svc.getById(id) : undefined;
     if (found) {
-      const { id: _id, code, createdAt, ...rest } = found;
+      const { id: _id, code, createdAt, updatedAt, ...rest } = found;
       this.d = { ...rest, rooms: [...rest.rooms] };
       this.isEdit = true;
       this.id = found.id;
@@ -279,7 +302,6 @@ export class ReservationFormComponent implements OnInit {
   }
 
   onTypeChange(): void {
-    if (this.d.reservationType === 'Evento / Pasadía') this.d.traStatus = 'No aplica';
     this.calcNights();
   }
 
@@ -292,8 +314,15 @@ export class ReservationFormComponent implements OnInit {
   // ── Resumen ──
   get guestsTotal(): number { return (+this.d.adults || 0) + (+this.d.children || 0) + (+this.d.infants || 0); }
   get capacity(): number { return this.catalog.filter(r => this.d.rooms.includes(r.number)).reduce((s, r) => s + r.capacity, 0); }
-  get balance(): number { return Math.max(0, (+this.d.totalAmount || 0) - (+this.d.paidAmount || 0)); }
-  get pay() { return paymentStatus({ ...this.d, totalAmount: +this.d.totalAmount, paidAmount: +this.d.paidAmount } as Reservation); }
+  get total(): number { return (+this.d.lodgingAmount || 0) + (+this.d.extrasAmount || 0); }
+  get paid(): number {
+    return this.d.payments.reduce((s, p) => s + p.amount, 0) + (this.isEdit ? 0 : +this.firstPayment.amount || 0);
+  }
+  get pending(): number { return Math.max(0, this.total - this.paid); }
+  get pay(): PaymentStatus {
+    if (this.total > 0 && this.paid >= this.total) return 'Pagado';
+    return this.paid > 0 ? 'Parcial' : 'Pendiente';
+  }
 
   // ── Guardar ──
   private validate(): string {
@@ -306,8 +335,9 @@ export class ReservationFormComponent implements OnInit {
       return sameDayAllowed ? 'La salida no puede ser antes de la entrada.' : 'La salida debe ser al menos un día después de la entrada.';
     }
     if ((+d.adults || 0) < 1) return 'Debe haber al menos un adulto.';
-    if ((+d.totalAmount || 0) <= 0) return 'Indica el valor total de la reserva.';
-    if ((+d.paidAmount || 0) > +d.totalAmount) return 'El valor abonado no puede superar el valor total.';
+    if ((+d.lodgingAmount || 0) <= 0) return 'Indica el valor del alojamiento.';
+    if ((+d.extrasAmount || 0) < 0) return 'Los servicios adicionales no pueden ser negativos.';
+    if (this.paid > this.total) return 'Lo pagado no puede superar el valor total de la reserva.';
 
     // Disponibilidad: ninguna otra reserva activa puede usar las mismas habitaciones en fechas que se crucen
     const clash = this.svc.getSnapshot().find(r =>
@@ -333,7 +363,7 @@ export class ReservationFormComponent implements OnInit {
       ...this.d,
       guestName: this.d.guestName.trim(),
       adults: +this.d.adults, children: +this.d.children || 0, infants: +this.d.infants || 0,
-      totalAmount: +this.d.totalAmount, paidAmount: +this.d.paidAmount || 0,
+      lodgingAmount: +this.d.lodgingAmount, extrasAmount: +this.d.extrasAmount || 0,
     };
 
     if (this.isEdit) {
@@ -341,6 +371,8 @@ export class ReservationFormComponent implements OnInit {
       this.router.navigate(['/dashboard/reservations', this.id]);
     } else {
       const created = this.svc.create(data);
+      const { amount, method, receipt } = this.firstPayment;
+      if (+amount > 0) this.svc.addPayment(created.id, { amount: +amount, method, receipt: receipt.trim() });
       this.router.navigate(['/dashboard/reservations', created.id]);
     }
   }

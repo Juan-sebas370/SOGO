@@ -1,7 +1,8 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { ReservationService, isoDate } from '../reservations/reservation.service';
+import { ReservationService } from '../reservations/reservation.service';
+import { isoDate } from '../shared/date-utils';
 import { Reservation, lodgingLabel } from '../reservations/reservation.model';
 import { StayService } from '../lodging/stay.service';
 import { Stay } from '../lodging/stay.model';

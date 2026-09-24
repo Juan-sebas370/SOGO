@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TraService } from '../tra.service';
 import { Tra } from '../tra.model';
+import { ReservationService } from '../../reservations/reservation.service';
+import { lodgingLabel, totalGuests } from '../../reservations/reservation.model';
 
 @Component({
   selector: 'app-tra-form',
@@ -80,7 +82,7 @@ import { Tra } from '../tra.model';
 
         <div class="form-field">
           <label>Reserva</label>
-          <input type="text" [(ngModel)]="f.reservationCode" placeholder="RES-00078" class="form-input">
+          <input type="text" [(ngModel)]="f.reservationCode" placeholder="RSV-2026-00125" class="form-input">
         </div>
 
         <div class="form-field">
@@ -238,13 +240,33 @@ export class TraFormComponent implements OnInit {
     generatedBy: 'Administrador'
   };
 
-  constructor(private svc: TraService, private router: Router, private route: ActivatedRoute) {}
+  constructor(
+    private svc: TraService,
+    private reservations: ReservationService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       const found = this.svc.getById(id);
       if (found) { this.f = { ...found }; this.isEdit = true; this.existingId = id; }
+      return;
+    }
+    // Llegando desde el detalle de una reserva (?reserva=RSV-...): se precargan sus datos
+    const code = this.route.snapshot.queryParamMap.get('reserva');
+    const r = code ? this.reservations.getSnapshot().find(x => x.code === code) : undefined;
+    if (r) {
+      const [firstName, ...rest] = r.guestName.split(' ');
+      this.f = {
+        ...this.f,
+        reservationCode: r.code, fullName: r.guestName, firstName, lastName: rest.join(' '),
+        docType: r.docType, docNumber: r.docNumber,
+        roomNumber: r.rooms.join(', '), roomType: lodgingLabel(r),
+        checkInDate: r.checkIn, checkOutDate: r.checkOut, nights: r.nights,
+        guests: totalGuests(r), plan: r.plan,
+      };
     }
   }
 

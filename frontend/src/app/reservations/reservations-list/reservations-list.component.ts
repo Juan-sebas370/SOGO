@@ -2,12 +2,14 @@ import { Component, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ReservationService, isoDate } from '../reservation.service';
+import { ReservationService } from '../reservation.service';
 import {
   Reservation, ReservationStatus, ReservationType, LodgingType, PaymentStatus, ReservationTraStatus,
-  paymentStatus, totalGuests, lodgingLabel, roomsLabel, isVoid
+  paymentStatus, totalGuests, lodgingLabel, roomsLabel, isVoid, balance
 } from '../reservation.model';
 import { fmtDate, fmtShortDate, fmtMoney, typeBadge, statusBadge, paymentBadge, traBadge } from '../reservation-format';
+import { downloadCsv } from '../reservation-documents';
+import { isoDate } from '../../shared/date-utils';
 
 type Tab = 'Todas' | 'Próximas' | 'Actuales' | 'Finalizadas' | 'Canceladas' | 'Pendientes de pago';
 
@@ -285,7 +287,7 @@ const PAGE_SIZE = 10;
             <td class="rsv-date-cell">{{ date(r.checkOut) }}</td>
             <td><span class="rsv-badge" [ngClass]="paymentBadge(pay(r))">{{ pay(r) }}</span></td>
             <td><span class="rsv-badge" [ngClass]="statusBadge(r.status)">{{ r.status }}</span></td>
-            <td><span class="rsv-badge" [ngClass]="traBadge(r.traStatus)">{{ r.traStatus }}</span></td>
+            <td><span class="rsv-badge" [ngClass]="traBadge(tra(r))">{{ tra(r) }}</span></td>
             <td class="rsv-col-actions">
               <div class="rsv-actions">
                 <a class="rsv-icon-btn rsv-icon-btn--view" [routerLink]="['/dashboard/reservations', r.id]" title="Ver detalle" aria-label="Ver detalle">
@@ -371,6 +373,7 @@ export class ReservationsListComponent {
   readonly guests = totalGuests;
   readonly lodging = lodgingLabel;
   readonly roomsText = roomsLabel;
+  readonly tra = (r: Reservation) => this.svc.traStatus(r);
 
   all: Reservation[] = [];
   filtered: Reservation[] = [];
@@ -479,7 +482,7 @@ export class ReservationsListComponent {
       (!this.f.lodging || r.lodgingType === this.f.lodging) &&
       (!this.f.status || r.status === this.f.status) &&
       (!this.f.payment || paymentStatus(r) === this.f.payment) &&
-      (!this.f.tra || r.traStatus === this.f.tra)
+      (!this.f.tra || this.svc.traStatus(r) === this.f.tra)
     );
 
     // Los contadores de cada tab reflejan los filtros activos
@@ -571,24 +574,7 @@ export class ReservationsListComponent {
 
   exportCsv(rows: Reservation[]): void {
     this.exportOpen = false;
-    if (!rows.length) return;
-    const header = ['Código', 'Huésped principal', 'Documento', 'Teléfono', 'Correo', 'Tipo de reserva', 'Alojamiento',
-      'Habitaciones', 'Adultos', 'Niños', 'Bebés', 'Entrada', 'Salida', 'Noches', 'Total', 'Abonado', 'Pago', 'Estado', 'TRA'];
-    const lines = rows.map(r => [
-      r.code, r.guestName, `${r.docType} ${r.docNumber}`, r.phone, r.email, r.reservationType, lodgingLabel(r),
-      roomsLabel(r), r.adults, r.children, r.infants, fmtDate(r.checkIn), fmtDate(r.checkOut), r.nights,
-      r.totalAmount, r.paidAmount, paymentStatus(r), r.status, r.traStatus
-    ]);
-    // Punto y coma + BOM: Excel en español lo abre en columnas y con tildes correctas
-    const csv = '﻿' + [header, ...lines]
-      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';'))
-      .join('\r\n');
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `reservas-${this.today}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadCsv(rows, this.tra, `reservas-${this.today}.csv`);
   }
 
   // ── Indicadores ──
@@ -613,7 +599,7 @@ export class ReservationsListComponent {
 
     const unpaid = this.all.filter(r => this.inTab(r, 'Pendientes de pago'));
     k.pendingPay = unpaid.length;
-    k.pendingAmount = unpaid.reduce((s, r) => s + (r.totalAmount - r.paidAmount), 0);
+    k.pendingAmount = unpaid.reduce((s, r) => s + balance(r), 0);
 
     k.confirmed = this.all.filter(r => r.status === 'Confirmada').length;
     k.confirmedPct = this.all.length ? Math.round((k.confirmed / this.all.length) * 100) : 0;

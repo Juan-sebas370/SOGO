@@ -3,8 +3,16 @@ export type ReservationType   = 'Individual' | 'Grupo familiar' | 'Grupo de trab
 // Habitación: una o varias habitaciones sueltas · Piso: el piso completo · Casa completa: todos los pisos
 export type LodgingType       = 'Habitación' | 'Piso' | 'Casa completa';
 export type PaymentStatus     = 'Pagado' | 'Parcial' | 'Pendiente';
-// Estado del registro TRA exigido para la reserva (una pasadía o una reserva que no se dio no lo requiere)
+export type PaymentMethod     = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Transferencia' | 'Tarjeta';
+// Estado del TRA para la reserva. No se guarda: ReservationService lo deriva del módulo TRA.
 export type ReservationTraStatus = 'Completa' | 'Pendiente' | 'No aplica';
+
+export interface Payment {
+  date:    string;          // YYYY-MM-DDTHH:mm
+  method:  PaymentMethod;
+  amount:  number;
+  receipt: string;          // n.º de comprobante
+}
 
 export interface Reservation {
   id:              string;
@@ -15,6 +23,7 @@ export interface Reservation {
   docNumber:       string;
   phone:           string;
   email:           string;
+  city:            string;          // Ciudad / Departamento de residencia
   // Reserva
   reservationType: ReservationType;
   lodgingType:     LodgingType;
@@ -27,19 +36,37 @@ export interface Reservation {
   checkOut:        string;          // YYYY-MM-DD
   nights:          number;
   plan:            string;
-  // Pago: el estado se deriva de estos dos montos, nunca se guarda aparte
-  totalAmount:     number;
-  paidAmount:      number;
+  // Valores: total, abonado, saldo y estado del pago se derivan, nunca se guardan aparte
+  lodgingAmount:   number;
+  extrasAmount:    number;          // servicios adicionales
+  payments:        Payment[];
   status:          ReservationStatus;
-  traStatus:       ReservationTraStatus;
   observations:    string;
-  createdAt:       string;
+  createdAt:       string;          // YYYY-MM-DDTHH:mm
+  updatedAt:       string;
   cancelReason?:   string;
 }
 
+export function totalAmount(r: Reservation): number {
+  return r.lodgingAmount + r.extrasAmount;
+}
+
+export function paidAmount(r: Reservation): number {
+  return r.payments.reduce((s, p) => s + p.amount, 0);
+}
+
+export function balance(r: Reservation): number {
+  return Math.max(0, totalAmount(r) - paidAmount(r));
+}
+
+export function lastPayment(r: Reservation): Payment | undefined {
+  return r.payments[r.payments.length - 1];
+}
+
 export function paymentStatus(r: Reservation): PaymentStatus {
-  if (r.paidAmount >= r.totalAmount && r.totalAmount > 0) return 'Pagado';
-  return r.paidAmount > 0 ? 'Parcial' : 'Pendiente';
+  const paid = paidAmount(r);
+  if (paid >= totalAmount(r) && totalAmount(r) > 0) return 'Pagado';
+  return paid > 0 ? 'Parcial' : 'Pendiente';
 }
 
 export function totalGuests(r: Reservation): number {

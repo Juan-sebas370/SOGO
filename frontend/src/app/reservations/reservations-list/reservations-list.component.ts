@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
   Reservation, ReservationStatus, ReservationType, LodgingType, PaymentStatus, ReservationTraStatus,
-  paymentStatus, totalGuests, lodgingLabel, roomsLabel, isVoid, balance
+  paymentStatus, totalGuests, lodgingLabel, roomsLabel, isVoid, balance, isInHouse, awaitsCheckIn
 } from '../reservation.model';
 import { fmtDate, fmtShortDate, fmtMoney, typeBadge, statusBadge, paymentBadge, traBadge } from '../reservation-format';
 import { downloadCsv } from '../reservation-documents';
@@ -324,7 +324,8 @@ const PAGE_SIZE = 10;
   <div class="rsv-popover rsv-row-menu" data-popover *ngIf="menu" [style.top.px]="menu.top" [style.left.px]="menu.left">
     <a [routerLink]="['/dashboard/reservations', menu.r.id]">Ver detalle</a>
     <a [routerLink]="['/dashboard/reservations', menu.r.id, 'edit']" *ngIf="canEdit(menu.r)">Editar</a>
-    <a routerLink="/dashboard/lodging/checkin" *ngIf="canCheckIn(menu.r)">Registrar check-in</a>
+    <a [routerLink]="['/dashboard/lodging', menu.r.id, 'checkin']" *ngIf="canCheckIn(menu.r)">Registrar check-in</a>
+    <a [routerLink]="['/dashboard/lodging', menu.r.id, 'checkout']" *ngIf="inHouse(menu.r)">Registrar check-out</a>
     <button type="button" class="danger" *ngIf="canCancel(menu.r)" (click)="openCancel(menu.r)">Cancelar reserva</button>
   </div>
 
@@ -373,6 +374,7 @@ export class ReservationsListComponent {
   readonly guests = totalGuests;
   readonly lodging = lodgingLabel;
   readonly roomsText = roomsLabel;
+  readonly inHouse = isInHouse;
   readonly tra = (r: Reservation) => this.svc.traStatus(r);
 
   all: Reservation[] = [];
@@ -555,9 +557,10 @@ export class ReservationsListComponent {
 
   // ── Acciones ──
   canEdit(r: Reservation): boolean { return r.status === 'Confirmada' || r.status === 'Pendiente'; }
-  canCancel(r: Reservation): boolean { return this.canEdit(r); }
+  // Con el huésped ya alojado no se cancela: se registra su check-out
+  canCancel(r: Reservation): boolean { return this.canEdit(r) && !r.checkedInAt; }
   canCheckIn(r: Reservation): boolean {
-    return this.canEdit(r) && r.checkIn <= this.checkinLimit && r.checkOut >= this.today;
+    return awaitsCheckIn(r) && r.checkIn <= this.today && r.checkOut >= this.today;
   }
 
   openCancel(r: Reservation): void {

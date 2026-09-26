@@ -2,9 +2,9 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { AppNotification } from './notification.model';
 import { ReservationService } from '../reservations/reservation.service';
-import { Reservation } from '../reservations/reservation.model';
-import { StayService } from '../lodging/stay.service';
+import { Reservation, isInHouse } from '../reservations/reservation.model';
 import { RoomService } from '../lodging/room.service';
+import { isoDate } from '../shared/date-utils';
 import { RoomWithStatus } from '../lodging/room.model';
 import { InvoiceService } from '../billing/invoice.service';
 import { InventoryService } from '../inventory/inventory.service';
@@ -21,7 +21,6 @@ export class NotificationService {
 
   constructor(
     private reservationService: ReservationService,
-    private stayService: StayService,
     private roomService: RoomService,
     private invoiceService: InvoiceService,
     private inventoryService: InventoryService,
@@ -43,11 +42,12 @@ export class NotificationService {
   private refresh(): void {
     const inv = this.inventoryService.getAlerts();
     const invoiceStats = this.invoiceService.getStats();
-    const departuresCount = this.stayService.getDepartures().length;
+    // Huéspedes alojados cuya salida prevista ya llegó (hoy o antes)
+    const departuresCount = this.reservations.filter(r => isInHouse(r) && r.checkOut <= isoDate(0)).length;
     const pendingReservations = this.reservations.filter(r => r.status === 'Pendiente').length;
     const traPending = this.reservations.filter(r => r.status === 'Confirmada' && this.reservationService.traStatus(r) === 'Pendiente').length;
     const cleaningRooms = this.rooms.filter(r => r.status === 'En limpieza');
-    const maintenanceRooms = this.rooms.filter(r => r.status === 'Mantenimiento');
+    const maintenanceRooms = this.rooms.filter(r => r.status === 'En mantenimiento' || r.status === 'Fuera de servicio');
 
     const list: AppNotification[] = [];
 
@@ -58,7 +58,7 @@ export class NotificationService {
       list.push({ icon: 'cleaning', level: 'Media', label: 'Habitación en limpieza', detail: `Habitación ${r.number} · Piso ${r.floor}`, link: '/dashboard/lodging' });
     });
     maintenanceRooms.forEach(r => {
-      list.push({ icon: 'maintenance', level: 'Alta', label: 'Habitación en mantenimiento', detail: `Habitación ${r.number} · Piso ${r.floor}`, link: '/dashboard/lodging' });
+      list.push({ icon: 'maintenance', level: 'Alta', label: `Habitación ${r.status.toLowerCase()}`, detail: `Habitación ${r.number} · Piso ${r.floor}`, link: '/dashboard/lodging' });
     });
     if (traPending > 0) {
       list.push({ icon: 'review', level: 'Media', label: 'TRA pendientes', detail: `${traPending} reserva(s) confirmada(s) sin TRA`, link: '/dashboard/reservations' });

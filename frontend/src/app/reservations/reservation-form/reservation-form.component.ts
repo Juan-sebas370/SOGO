@@ -107,7 +107,7 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
             <div class="rsv-room-chips">
               <button type="button" *ngFor="let room of roomsOn(fl)" class="rsv-room-chip"
                       [class.active]="d.rooms.includes(room.number)" (click)="toggleRoom(room.number)">
-                {{ room.number }} <small>{{ room.type }} · {{ room.capacity }}p</small>
+                {{ room.number }} <small>{{ room.capacity }} pers. · {{ money(room.pricePerNight) }}/noche</small>
               </button>
             </div>
           </div>
@@ -159,6 +159,10 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
         <div class="rsv-field">
           <label for="lodgingAmount">Valor alojamiento (COP) *</label>
           <input id="lodgingAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.lodgingAmount">
+          <small class="rsv-form-hint" *ngIf="suggestedAmount && +d.lodgingAmount !== suggestedAmount">
+            Tarifa: {{ money(ratePerNight) }} × {{ d.nights }} noche{{ d.nights === 1 ? '' : 's' }} = {{ money(suggestedAmount) }}
+            <button type="button" (click)="d.lodgingAmount = suggestedAmount">Usar</button>
+          </small>
         </div>
         <div class="rsv-field">
           <label for="extrasAmount">Servicios adicionales (COP)</label>
@@ -270,6 +274,16 @@ export class ReservationFormComponent implements OnInit {
       this.isEdit = true;
       this.id = found.id;
       this.code = code;
+      return;
+    }
+
+    // Desde Alojamiento: ?habitacion=102 o ?casa=1 preseleccionan el alojamiento
+    const query = this.route.snapshot.queryParamMap;
+    const room = query.get('habitacion');
+    if (query.get('casa')) {
+      this.setLodging('Casa completa');
+    } else if (room && this.catalog.some(r => r.number === room)) {
+      this.d.rooms = [room];
     }
   }
 
@@ -314,6 +328,13 @@ export class ReservationFormComponent implements OnInit {
   // ── Resumen ──
   get guestsTotal(): number { return (+this.d.adults || 0) + (+this.d.children || 0) + (+this.d.infants || 0); }
   get capacity(): number { return this.catalog.filter(r => this.d.rooms.includes(r.number)).reduce((s, r) => s + r.capacity, 0); }
+  /** Suma de la tarifa base por noche de las habitaciones elegidas. */
+  get ratePerNight(): number {
+    return this.catalog.filter(r => this.d.rooms.includes(r.number)).reduce((s, r) => s + r.pricePerNight, 0);
+  }
+  /** Sugerencia (no obligatoria) para el valor del alojamiento; las pasadías se tarifan aparte. */
+  get suggestedAmount(): number { return this.ratePerNight * this.d.nights; }
+
   get total(): number { return (+this.d.lodgingAmount || 0) + (+this.d.extrasAmount || 0); }
   get paid(): number {
     return this.d.payments.reduce((s, p) => s + p.amount, 0) + (this.isEdit ? 0 : +this.firstPayment.amount || 0);

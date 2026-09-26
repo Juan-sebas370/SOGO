@@ -1,4 +1,4 @@
-@import url('../../shared/styles/list-page.css');
+@import url('./list-page.css');
 
 .confirm-page {
   display: flex;

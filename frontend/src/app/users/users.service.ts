@@ -61,6 +61,12 @@ export class UsersService {
   getModules():   string[]                     { return ALL_MODULES; }
   getLogs():      AuditLog[]                   { return this.logs; }
 
+  /** Registra una acción de cualquier módulo en la auditoría (usuario = rol de la sesión). */
+  addLog(action: string, detail: string): void {
+    const user = localStorage.getItem('sogo_role') || 'Usuario';
+    this.logs.unshift({ id: String(Date.now()), dateTime: new Date().toISOString(), user, action, detail, ip: '192.168.1.1' });
+  }
+
   createUser(u: Omit<AppUser,'id'|'code'|'lastAccess'|'createdAt'>): AppUser {
     const n = this.users.length + 1;
     const newU: AppUser = { ...u, id: String(Date.now()), code: `USR-${String(n).padStart(4,'0')}`, lastAccess: '', createdAt: new Date().toISOString().slice(0,10) };

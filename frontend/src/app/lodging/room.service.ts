@@ -1,39 +1,56 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { Room, RoomStatus, RoomWithStatus } from './room.model';
-import { StayService } from './stay.service';
+import { Room, RoomStatus, RoomWithStatus, ManualRoomStatus } from './room.model';
 import { ReservationService } from '../reservations/reservation.service';
-import { Reservation } from '../reservations/reservation.model';
+import { Reservation, isInHouse, awaitsCheckIn } from '../reservations/reservation.model';
+import { isoDate } from '../shared/date-utils';
 
-// El catálogo de habitaciones no existe todavía como entidad propia en el resto del
-// proyecto (Reservation/Stay solo guardan roomNumber como texto libre). Este servicio
-// lo modela por primera vez, usando los mismos números de habitación que ya aparecen
-// en los datos mock de reservas/estadías para que ambos lados coincidan.
+// Catálogo de habitaciones del hospedaje. El estado de cada una se deriva en vivo
+// de las reservas (check-in / llegada del día); solo limpieza, mantenimiento y
+// fuera de servicio se asignan a mano desde Alojamiento.
 @Injectable({ providedIn: 'root' })
 export class RoomService {
 
+  // Piso 1: 3 habitaciones · 8 personas · 3 camas dobles · 1 camarote
+  // Piso 2: 4 habitaciones · 12 personas · 4 camas dobles · 2 camarotes
+  // Casa completa: 7 habitaciones · 20 personas · 7 camas dobles · 3 camarotes
   private rooms: Room[] = [
-    { id:'r1', number:'102', floor:1, type:'Doble Estándar', capacity:2 },
-    { id:'r2', number:'104', floor:1, type:'Doble Estándar', capacity:2 },
-    { id:'r3', number:'105', floor:1, type:'Simple',         capacity:1 },
-    { id:'r4', number:'106', floor:1, type:'Simple',         capacity:1 },
-    { id:'r5', number:'201', floor:2, type:'Doble Estándar', capacity:2 },
-    { id:'r6', number:'203', floor:2, type:'Suite',          capacity:2 },
-    { id:'r7', number:'301', floor:2, type:'Suite',          capacity:3 },
+    { id: 'r101', number: '101', floor: 1, type: 'Familiar', capacity: 4, beds: ['1 cama doble', '1 camarote'], bathroom: 'Privado',
+      photos: ['assets/piso1/hab101.jpg'],
+      pricePerNight: 120000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada', 'Lavandería'],
+      description: 'Habitación principal del piso 1 con cama doble y camarote. Baño privado, ideal para 4 personas en un ambiente acogedor.' },
+    { id: 'r102', number: '102', floor: 1, type: 'Doble', capacity: 2, beds: ['1 cama doble'], bathroom: 'Compartido', sharesBathWith: '103',
+      photos: ['assets/piso1/hab102.jpg'],
+      pricePerNight: 75000, services: ['WiFi gratis'],
+      description: 'Habitación simple con vista a la calle.' },
+    { id: 'r103', number: '103', floor: 1, type: 'Doble', capacity: 2, beds: ['1 cama doble'], bathroom: 'Compartido', sharesBathWith: '102',
+      photos: ['assets/piso1/hab103.jpg'],
+      pricePerNight: 100000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada', 'Lavandería'],
+      description: 'Habitación doble con cama matrimonial. Comparte baño con la habitación 102. Ambiente tranquilo y acogedor.' },
+    { id: 'r201', number: '201', floor: 2, type: 'Familiar', capacity: 4, beds: ['1 cama doble', '1 camarote'], bathroom: 'Privado',
+      photos: ['assets/piso2/hab201.jpeg', 'assets/piso2/hab201-2.jpeg', 'assets/piso2/hab201-3.jpeg'],
+      pricePerNight: 80000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada', 'Lavandería'],
+      description: 'Habitación con cama doble y camarote. Baño privado, ideal para 4 personas en un ambiente acogedor y tranquilo.' },
+    { id: 'r202', number: '202', floor: 2, type: 'Doble', capacity: 2, beds: ['1 cama doble'], bathroom: 'Compartido', sharesBathWith: '203',
+      photos: ['assets/piso2/hab202.jpeg', 'assets/piso2/hab202-2.jpeg', 'assets/piso2/hab202-3.jpeg'],
+      pricePerNight: 110000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada'],
+      description: 'Habitación doble acogedora con cama matrimonial. Comparte baño con la habitación 203. Perfecta para parejas.' },
+    { id: 'r203', number: '203', floor: 2, type: 'Doble', capacity: 2, beds: ['1 cama doble'], bathroom: 'Compartido', sharesBathWith: '202',
+      photos: ['assets/piso2/hab203.jpg'],
+      pricePerNight: 115000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada', 'Lavandería'],
+      description: 'Habitación doble con cama matrimonial y ambiente tranquilo. Comparte baño con la habitación 202. Vistas al entorno cafetero.' },
+    { id: 'r204', number: '204', floor: 2, type: 'Familiar', capacity: 4, beds: ['1 cama doble', '1 camarote'], bathroom: 'Privado',
+      photos: ['assets/piso2/hab204.jpg'],
+      pricePerNight: 80000, services: ['WiFi gratis', 'Agua caliente', 'Cocina equipada', 'Lavandería'],
+      description: 'Habitación con cama doble y camarote. Baño privado, ideal para 4 personas en un ambiente acogedor y tranquilo.' },
   ];
 
-  // Estado manual (limpieza/mantenimiento): lo único que este servicio necesita
-  // "recordar" por sí mismo. Ocupada/Reservada/Disponible se derivan en vivo de
-  // StayService y ReservationService para que nunca queden desincronizados.
-  // r4 (106) arranca "En limpieza": su estadía mock ya está 'Finalizado' (el huésped
-  // se fue), así que es el caso real más plausible para la demo, a diferencia de
-  // marcar una habitación que todavía tiene un huésped alojado.
-  private manualStatus = new Map<string, 'En limpieza' | 'Mantenimiento'>([['r4', 'En limpieza']]);
+  // 202 arranca en limpieza: es la que dejó libre la última estadía de la demo
+  private manualStatus = new Map<string, ManualRoomStatus>([['r202', 'En limpieza']]);
   private reservations: Reservation[] = [];
-
   private roomsWithStatus$ = new BehaviorSubject<RoomWithStatus[]>([]);
 
-  constructor(private stayService: StayService, private reservationService: ReservationService) {
+  constructor(private reservationService: ReservationService) {
     this.reservationService.getAll().subscribe(list => {
       this.reservations = list;
       this.refresh();
@@ -48,18 +65,10 @@ export class RoomService {
     return this.roomsWithStatus$.value;
   }
 
-  markCleaning(roomId: string): void {
-    this.manualStatus.set(roomId, 'En limpieza');
-    this.refresh();
-  }
-
-  markMaintenance(roomId: string): void {
-    this.manualStatus.set(roomId, 'Mantenimiento');
-    this.refresh();
-  }
-
-  clearManualStatus(roomId: string): void {
-    this.manualStatus.delete(roomId);
+  setManualStatus(roomNumber: string, status: ManualRoomStatus | null): void {
+    const room = this.rooms.find(r => r.number === roomNumber);
+    if (!room) return;
+    status ? this.manualStatus.set(room.id, status) : this.manualStatus.delete(room.id);
     this.refresh();
   }
 
@@ -67,19 +76,15 @@ export class RoomService {
     const manual = this.manualStatus.get(room.id);
     if (manual) return manual;
 
-    const occupied = this.stayService.getInHouse().some(s => s.roomNumber === room.number);
-    if (occupied) return 'Ocupada';
+    const uses = (r: Reservation) => r.rooms.includes(room.number);
+    if (this.reservations.some(r => uses(r) && isInHouse(r))) return 'Ocupada';
 
-    const reserved = this.reservations.some(r =>
-      r.rooms.includes(room.number) && (r.status === 'Confirmada' || r.status === 'Pendiente')
-    );
-    if (reserved) return 'Reservada';
-
-    return 'Disponible';
+    const today = isoDate(0);
+    const arrivingNow = this.reservations.some(r => uses(r) && awaitsCheckIn(r) && r.checkIn <= today && r.checkOut >= today);
+    return arrivingNow ? 'Reservada' : 'Disponible';
   }
 
   private refresh(): void {
-    const list: RoomWithStatus[] = this.rooms.map(room => ({ ...room, status: this.statusFor(room) }));
-    this.roomsWithStatus$.next(list);
+    this.roomsWithStatus$.next(this.rooms.map(room => ({ ...room, status: this.statusFor(room) })));
   }
 }

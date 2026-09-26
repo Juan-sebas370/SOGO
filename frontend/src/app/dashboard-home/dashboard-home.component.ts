@@ -3,9 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { ReservationService } from '../reservations/reservation.service';
 import { isoDate } from '../shared/date-utils';
-import { Reservation, lodgingLabel } from '../reservations/reservation.model';
-import { StayService } from '../lodging/stay.service';
-import { Stay } from '../lodging/stay.model';
+import { Reservation, lodgingLabel, isInHouse, awaitsCheckIn } from '../reservations/reservation.model';
 import { RoomService } from '../lodging/room.service';
 import { RoomStatus, RoomWithStatus } from '../lodging/room.model';
 import { InvoiceService } from '../billing/invoice.service';
@@ -29,19 +27,21 @@ interface AgendaItem {
 type AgendaTab = 'Todos' | 'Llegada' | 'Salida' | 'Limpieza' | 'Mantenimiento';
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
-  'Disponible':    '#23B57B',
-  'Ocupada':       '#0E5A9C',
-  'Reservada':     '#F4B942',
-  'En limpieza':   '#06B6D4',
-  'Mantenimiento': '#DC2626',
+  'Disponible':        '#23B57B',
+  'Ocupada':           '#0E5A9C',
+  'Reservada':         '#F4B942',
+  'En limpieza':       '#06B6D4',
+  'En mantenimiento':  '#EA580C',
+  'Fuera de servicio': '#DC2626',
 };
 
 const FLOOR_STATUS_ABBR: Record<RoomStatus, string> = {
-  'Disponible':    'disp.',
-  'Ocupada':       'ocup.',
-  'Reservada':     'res.',
-  'En limpieza':   'limp.',
-  'Mantenimiento': 'mant.',
+  'Disponible':        'disp.',
+  'Ocupada':           'ocup.',
+  'Reservada':         'res.',
+  'En limpieza':       'limp.',
+  'En mantenimiento':  'mant.',
+  'Fuera de servicio': 'f. serv.',
 };
 
 @Component({
@@ -70,7 +70,7 @@ const FLOOR_STATUS_ABBR: Record<RoomStatus, string> = {
       </div>
       <span class="dash-stat-label">Salidas próximas</span>
       <span class="dash-stat-value">{{ departuresCount }}</span>
-      <span class="dash-stat-detail">{{ departuresInProgress }} en check-out · {{ departuresPending }} por salir</span>
+      <span class="dash-stat-detail">{{ departuresToday }} hoy · {{ departuresLater }} más adelante</span>
       <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
     </a>
 
@@ -352,8 +352,8 @@ export class DashboardHomeComponent {
   occupiedRooms = 0;
   occupancyPct = 0;
   departuresCount = 0;
-  departuresPending = 0;
-  departuresInProgress = 0;
+  departuresToday = 0;
+  departuresLater = 0;
   activeReservations = 0;
   arrivalsConfirmed = 0;
   arrivalsPending = 0;
@@ -367,7 +367,7 @@ export class DashboardHomeComponent {
 
   recentReservations: Reservation[] = [];
   upcomingArrivals: Reservation[] = [];
-  upcomingDepartures: Stay[] = [];
+  upcomingDepartures: Reservation[] = [];
   alerts: AppNotification[] = [];
 
   roomStatusCounts: StatusCount[] = [];
@@ -382,7 +382,6 @@ export class DashboardHomeComponent {
 
   constructor(
     private reservationService: ReservationService,
-    private stayService: StayService,
     private roomService: RoomService,
     private invoiceService: InvoiceService,
     private restaurantService: RestaurantService,
@@ -403,14 +402,6 @@ export class DashboardHomeComponent {
     });
 
     this.notificationService.getAll().subscribe(list => this.alerts = list);
-
-    const departures = this.stayService.getDepartures();
-    this.departuresCount = departures.length;
-    this.departuresPending = departures.filter(s => s.status === 'Por salir').length;
-    this.departuresInProgress = departures.filter(s => s.status === 'Check-Out').length;
-    this.upcomingDepartures = [...this.stayService.getInHouse(), ...this.stayService.getDepartures()]
-      .sort((a, b) => a.estimatedCheckOut.localeCompare(b.estimatedCheckOut))
-      .slice(0, 4);
 
     this.invoiceStats = this.invoiceService.getStats();
     this.incomeByDate = this.invoiceService.getIncomeByDate();
@@ -455,7 +446,14 @@ export class DashboardHomeComponent {
       .slice(0, 5);
 
     const today = isoDate(0);
-    const allUpcomingArrivals = active.filter(r => r.checkIn >= today);
+    // Salidas: huéspedes alojados, las más próximas primero
+    const inHouse = this.reservations.filter(isInHouse).sort((a, b) => a.checkOut.localeCompare(b.checkOut));
+    this.departuresCount = inHouse.length;
+    this.departuresToday = inHouse.filter(r => r.checkOut <= today).length;
+    this.departuresLater = this.departuresCount - this.departuresToday;
+    this.upcomingDepartures = inHouse.slice(0, 4);
+
+    const allUpcomingArrivals = this.reservations.filter(r => awaitsCheckIn(r) && r.checkIn >= today);
     this.arrivalsConfirmed = allUpcomingArrivals.filter(r => r.status === 'Confirmada').length;
     this.arrivalsPending = allUpcomingArrivals.filter(r => r.status === 'Pendiente').length;
     this.upcomingArrivals = [...allUpcomingArrivals]
@@ -511,12 +509,13 @@ export class DashboardHomeComponent {
         date: r.checkIn, status: r.status, statusClass: this.badgeClass(r.status)
       });
     });
-    this.upcomingDepartures.forEach(s => {
-      const floor = this.floorFor(s.roomNumber);
+    const today = isoDate(0);
+    this.upcomingDepartures.forEach(r => {
+      const floor = r.lodgingType === 'Habitación' ? this.floorFor(r.rooms[0]) : undefined;
       items.push({
-        type: 'Salida', title: s.guestName,
-        detail: `Habitación ${s.roomNumber}${floor ? ' · Piso ' + floor : ''}`,
-        date: s.estimatedCheckOut, status: s.status, statusClass: 'dash-badge--checkout'
+        type: 'Salida', title: r.guestName,
+        detail: `${lodgingLabel(r)}${floor ? ' · Piso ' + floor : ''}`,
+        date: r.checkOut, status: r.checkOut <= today ? 'Sale hoy' : 'En hospedaje', statusClass: 'dash-badge--checkout'
       });
     });
     this.rooms.filter(r => r.status === 'En limpieza').forEach(r => {
@@ -525,10 +524,10 @@ export class DashboardHomeComponent {
         date: '', status: 'En limpieza', statusClass: 'dash-badge--cleaning'
       });
     });
-    this.rooms.filter(r => r.status === 'Mantenimiento').forEach(r => {
+    this.rooms.filter(r => r.status === 'En mantenimiento' || r.status === 'Fuera de servicio').forEach(r => {
       items.push({
         type: 'Mantenimiento', title: `Habitación ${r.number}`, detail: `Piso ${r.floor} · ${r.type}`,
-        date: '', status: 'En mantenimiento', statusClass: 'dash-badge--maintenance'
+        date: '', status: r.status, statusClass: 'dash-badge--maintenance'
       });
     });
 

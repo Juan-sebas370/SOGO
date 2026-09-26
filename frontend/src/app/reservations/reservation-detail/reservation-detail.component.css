@@ -1,4 +1,4 @@
-@import url('../reservations.css');
+@import url('../../shared/styles/page-kit.css');
 
 /* =====================================================
    RESERVAS — detalle de una reserva
@@ -102,7 +102,8 @@
   box-shadow: 0 12px 32px rgba(15,23,42,0.14);
 }
 
-.rd-popover button {
+.rd-popover button,
+.rd-popover a {
   display: block;
   width: 100%;
   padding: 9px 12px;
@@ -114,9 +115,12 @@
   font-size: 13px;
   color: #1F2937;
   cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
 }
 
-.rd-popover button:hover { background: #F4F7FB; }
+.rd-popover button:hover,
+.rd-popover a:hover { background: #F4F7FB; }
 
 /* Badge en forma de píldora (estado) */
 .rsv-badge--pill {

@@ -1,177 +1,173 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { StayService } from '../stay.service';
-import { Stay } from '../stay.model';
 import { ReservationService } from '../../reservations/reservation.service';
-import { Reservation, lodgingLabel, totalGuests } from '../../reservations/reservation.model';
+import { Reservation, awaitsCheckIn, isInHouse, lodgingLabel, balance } from '../../reservations/reservation.model';
+import { fmtDate, fmtMoney } from '../../reservations/reservation-format';
+import { RoomService } from '../room.service';
+import { isoDate, isoDateTime } from '../../shared/date-utils';
 
 @Component({
   selector: 'app-checkin-form',
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
-  styleUrls: ['./checkin-form.component.css'],
+  styleUrls: ['../lodging-flow.css'],
   template: `
-  <div class="res-page">
+  <nav class="lod-breadcrumb" aria-label="Ruta">
+    <a routerLink="/dashboard">Dashboard</a><span aria-hidden="true">›</span>
+    <a routerLink="/dashboard/lodging">Alojamiento</a><span aria-hidden="true">›</span><span>Check-In</span>
+  </nav>
+  <h1 class="flow-title">Registrar check-in</h1>
+  <p class="flow-subtitle">Confirma la llegada del huésped y los datos con los que se aloja.</p>
 
-    <div class="res-breadcrumb">
-      <a routerLink="/dashboard">Dashboard</a><span>›</span>
-      <a routerLink="/dashboard/lodging">Alojamiento</a><span>›</span>
-      <span>Check-In</span>
-    </div>
-
-    <h1 class="res-title">Check-In</h1>
-
-    <!-- Selector de reserva (cuando no viene con id) -->
-    <div class="form-section selector-section" *ngIf="!stay">
-      <h2 class="form-section-title">Seleccionar Reserva</h2>
-      <p class="recover-desc">Selecciona la reserva confirmada para registrar el Check-In.</p>
-      <div class="form-field">
-        <label>Reserva</label>
-        <select [(ngModel)]="selectedReservationId" (ngModelChange)="loadFromReservation()" class="form-select">
-          <option value="">Seleccionar reserva...</option>
-          <option *ngFor="let r of confirmedReservations" [value]="r.id">
-            {{ r.code }} — {{ r.guestName }} ({{ lodging(r) }})
-          </option>
-        </select>
-      </div>
-      <div class="form-error" *ngIf="errorMsg">{{ errorMsg }}</div>
-    </div>
-
-    <!-- Formulario (cuando hay stay cargado) -->
-    <div class="form-grid" *ngIf="stay">
-      <!-- Izquierda: Info de la reserva -->
-      <div class="form-section">
-        <h2 class="form-section-title">Información de la Reserva</h2>
-        <div class="detail-row"><span class="detail-label">Código de Reserva</span><span class="res-code">{{ stay.reservationCode }}</span></div>
-        <div class="detail-row"><span class="detail-label">Huésped</span><span class="detail-value">{{ stay.guestName }}</span></div>
-        <div class="detail-row"><span class="detail-label">Habitación</span><span class="detail-value">{{ stay.roomType }}</span></div>
-        <div class="detail-row"><span class="detail-label">Fecha de Entrada</span><span class="detail-value">{{ stay.checkInDate | date:'dd/MM/yyyy' }}</span></div>
-        <div class="detail-row"><span class="detail-label">Fecha de Salida Estimada</span><span class="detail-value">{{ stay.estimatedCheckOut | date:'dd/MM/yyyy' }}</span></div>
-        <div class="detail-row"><span class="detail-label">Noches</span><span class="detail-value">{{ stay.nights }}</span></div>
-        <div class="detail-row"><span class="detail-label">Plan / Tarifa</span><span class="detail-value">{{ stay.plan }}</span></div>
-        <div class="detail-row" *ngIf="stay.observations"><span class="detail-label">Observaciones</span><span class="detail-value">{{ stay.observations }}</span></div>
-      </div>
-
-      <!-- Derecha: Datos del Check-In -->
-      <div class="form-section">
-        <h2 class="form-section-title">Datos del Check-In</h2>
-
-        <div class="form-field">
-          <label>Fecha de Check-In *</label>
-          <input type="date" [(ngModel)]="form.checkInDate" class="form-input">
+  <!-- Sin reserva elegida: llegadas pendientes de hoy -->
+  <section class="rsv-panel flow-card flow-picker" *ngIf="!r">
+    <h2 class="flow-card-title">Llegadas pendientes</h2>
+    <ul class="flow-arrivals" *ngIf="arrivals.length; else noArrivals">
+      <li *ngFor="let a of arrivals">
+        <div>
+          <strong>{{ a.guestName }}</strong>
+          <span>{{ a.code }} · {{ lodging(a) }} · {{ date(a.checkIn) }} - {{ date(a.checkOut) }}</span>
         </div>
+        <a class="rsv-btn rsv-btn--primary" [routerLink]="['/dashboard/lodging', a.id, 'checkin']">Registrar</a>
+      </li>
+    </ul>
+    <ng-template #noArrivals><p class="flow-empty">No hay reservas esperando check-in hoy.</p></ng-template>
+  </section>
 
-        <div class="form-field">
-          <label>Hora de Check-In *</label>
-          <input type="time" [(ngModel)]="form.checkInTime" class="form-input">
+  <div class="flow-grid" *ngIf="r">
+    <section class="rsv-panel flow-card">
+      <h2 class="flow-card-title">Reserva</h2>
+      <dl class="flow-dl">
+        <div><dt>Código</dt><dd><a [routerLink]="['/dashboard/reservations', r.id]">{{ r.code }}</a></dd></div>
+        <div><dt>Huésped principal</dt><dd>{{ r.guestName }}</dd></div>
+        <div><dt>Alojamiento</dt><dd>{{ lodging(r) }} · hab. {{ r.rooms.join(', ') }}</dd></div>
+        <div><dt>Entrada - Salida</dt><dd>{{ date(r.checkIn) }} - {{ date(r.checkOut) }}</dd></div>
+        <div><dt>Plan / tarifa</dt><dd>{{ r.plan }}</dd></div>
+        <div><dt>Saldo pendiente</dt><dd [class.flow-warn-text]="pending > 0">{{ money(pending) }}</dd></div>
+        <div><dt>TRA</dt><dd>{{ tra }}</dd></div>
+      </dl>
+      <p class="flow-alert" *ngIf="tra === 'Pendiente'">
+        El TRA de esta reserva está pendiente.
+        <a routerLink="/dashboard/tra/new" [queryParams]="{ reserva: r.code }">Registrar TRA</a>
+      </p>
+      <p class="flow-alert" *ngIf="cleaningRooms.length">
+        Habitación{{ cleaningRooms.length > 1 ? 'es' : '' }} {{ cleaningRooms.join(', ') }} en limpieza: al confirmar quedará{{ cleaningRooms.length > 1 ? 'n' : '' }} ocupada{{ cleaningRooms.length > 1 ? 's' : '' }}.
+      </p>
+    </section>
+
+    <section class="rsv-panel flow-card">
+      <h2 class="flow-card-title">Datos del check-in</h2>
+      <div class="flow-row">
+        <div class="rsv-field">
+          <label for="ci-date">Fecha *</label>
+          <input id="ci-date" type="date" class="rsv-input" [(ngModel)]="form.date">
         </div>
-
-        <div class="form-field">
-          <label>Documento de Identidad *</label>
-          <input type="text" [(ngModel)]="form.docNumber" placeholder="1234567890" class="form-input">
-        </div>
-
-        <div class="form-field">
-          <label>Número de Huéspedes *</label>
-          <input type="number" [(ngModel)]="form.guests" min="1" max="10" class="form-input">
-        </div>
-
-        <div class="form-field">
-          <label>Observaciones</label>
-          <textarea [(ngModel)]="form.observations" rows="3" placeholder="Observaciones adicionales..." class="form-textarea"></textarea>
+        <div class="rsv-field">
+          <label for="ci-time">Hora *</label>
+          <input id="ci-time" type="time" class="rsv-input" [(ngModel)]="form.time">
         </div>
       </div>
-    </div>
+      <div class="rsv-field">
+        <label for="ci-doc">Documento del huésped principal ({{ r.docType }}) *</label>
+        <input id="ci-doc" type="text" class="rsv-input" [(ngModel)]="form.docNumber">
+      </div>
+      <div class="flow-row flow-row--3">
+        <div class="rsv-field">
+          <label for="ci-adults">Adultos *</label>
+          <input id="ci-adults" type="number" min="1" class="rsv-input" [(ngModel)]="form.adults">
+        </div>
+        <div class="rsv-field">
+          <label for="ci-children">Niños</label>
+          <input id="ci-children" type="number" min="0" class="rsv-input" [(ngModel)]="form.children">
+        </div>
+        <div class="rsv-field">
+          <label for="ci-infants">Bebés</label>
+          <input id="ci-infants" type="number" min="0" class="rsv-input" [(ngModel)]="form.infants">
+        </div>
+      </div>
+      <div class="rsv-field">
+        <label for="ci-obs">Observaciones</label>
+        <textarea id="ci-obs" rows="3" class="rsv-input" [(ngModel)]="form.observations"></textarea>
+      </div>
+    </section>
+  </div>
 
-    <div class="form-error" *ngIf="stay && errorMsg">{{ errorMsg }}</div>
+  <div class="flow-error" *ngIf="errorMsg" role="alert">{{ errorMsg }}</div>
 
-    <div class="form-footer">
-      <button class="btn-secondary" routerLink="/dashboard/lodging">Cancelar</button>
-      <button class="btn-primary" (click)="confirm()" *ngIf="stay">
-        Confirmar Check-In
-      </button>
-    </div>
-
+  <div class="flow-footer">
+    <a class="rsv-btn rsv-btn--outline" routerLink="/dashboard/lodging">Cancelar</a>
+    <button type="button" class="rsv-btn rsv-btn--primary" *ngIf="r" (click)="confirm()">Confirmar check-in</button>
   </div>
   `
 })
-export class CheckinFormComponent implements OnInit {
-  stay?: Stay;
-  errorMsg = '';
-  selectedReservationId = '';
-  confirmedReservations: Reservation[] = [];
+export class CheckinFormComponent {
+
+  readonly date = fmtDate;
+  readonly money = fmtMoney;
   readonly lodging = lodgingLabel;
 
-  form = {
-    checkInDate:  new Date().toISOString().slice(0, 10),
-    checkInTime:  new Date().toTimeString().slice(0, 5),
-    docNumber:    '',
-    guests:       1,
-    observations: ''
-  };
+  r?: Reservation;
+  arrivals: Reservation[] = [];
+  errorMsg = '';
+
+  form = { date: isoDate(0), time: isoDateTime().slice(11, 16), docNumber: '', adults: 1, children: 0, infants: 0, observations: '' };
 
   constructor(
-    private svc: StayService,
-    private resSvc: ReservationService,
+    private svc: ReservationService,
+    private roomSvc: RoomService,
     private router: Router,
-    private route: ActivatedRoute
-  ) {}
-
-  ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (id) {
-      this.stay = this.svc.getById(id);
-      if (this.stay) {
-        this.form.docNumber    = this.stay.docNumber;
-        this.form.guests       = this.stay.guests;
-        this.form.observations = this.stay.observations;
-      }
-    } else {
-      // Cargar reservas confirmadas para el selector
-      this.resSvc.getAll().subscribe(list => {
-        this.confirmedReservations = list.filter(r => r.status === 'Confirmada' || r.status === 'Pendiente');
-      });
+    route: ActivatedRoute
+  ) {
+    const id = route.snapshot.paramMap.get('id');
+    const today = isoDate(0);
+    if (!id) {
+      this.arrivals = this.svc.getSnapshot()
+        .filter(r => awaitsCheckIn(r) && r.checkIn <= today && r.checkOut >= today)
+        .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+      return;
     }
+    const r = this.svc.getById(id);
+    if (!r || !awaitsCheckIn(r)) { this.router.navigate(['/dashboard/lodging']); return; }
+    this.r = r;
+    this.form = { ...this.form, docNumber: r.docNumber, adults: r.adults, children: r.children, infants: r.infants, observations: r.observations };
   }
 
-  loadFromReservation(): void {
-    if (!this.selectedReservationId) return;
-    const res = this.resSvc.getById(this.selectedReservationId);
-    if (!res) return;
-    // Crear stay temporal desde la reserva
-    this.stay = this.svc.addFromReservation({
-      reservationCode: res.code,
-      guestName:       res.guestName,
-      roomNumber:      res.rooms.join(', '),
-      roomType:        `${lodgingLabel(res)} · ${res.reservationType}`,
-      checkInDate:     res.checkIn,
-      checkOutDate:    res.checkOut,
-      nights:          res.nights,
-      guests:          totalGuests(res),
-      plan:            res.plan,
-      docNumber:       res.docNumber ?? '',
-      observations:    res.observations
-    });
-    this.form.docNumber    = res.docNumber ?? '';
-    this.form.guests       = totalGuests(res);
-    this.form.observations = res.observations;
+  get pending(): number { return balance(this.r!); }
+  get tra() { return this.svc.traStatus(this.r!); }
+
+  get cleaningRooms(): string[] {
+    return this.roomSvc.getSnapshot().filter(room => this.r!.rooms.includes(room.number) && room.status === 'En limpieza').map(room => room.number);
+  }
+
+  private validate(): string {
+    const r = this.r!;
+    if (!this.form.date || !this.form.time) return 'Indica la fecha y la hora del check-in.';
+    if (!this.form.docNumber.trim()) return 'Confirma el documento del huésped principal.';
+    if ((+this.form.adults || 0) < 1) return 'Debe haber al menos un adulto.';
+
+    const rooms = this.roomSvc.getSnapshot().filter(room => r.rooms.includes(room.number));
+    const blocked = rooms.filter(room => room.status === 'En mantenimiento' || room.status === 'Fuera de servicio');
+    if (blocked.length) return `No se puede alojar: ${blocked.map(b => `${b.number} (${b.status.toLowerCase()})`).join(', ')}.`;
+
+    const busy = this.svc.getSnapshot().find(o => o.id !== r.id && isInHouse(o) && o.rooms.some(n => r.rooms.includes(n)));
+    if (busy) return `Las habitaciones siguen ocupadas por ${busy.guestName} (${busy.code}). Registra primero su check-out.`;
+    return '';
   }
 
   confirm(): void {
-    if (!this.stay) return;
-    if (!this.form.checkInDate || !this.form.checkInTime || !this.form.docNumber) {
-      this.errorMsg = 'Por favor completa todos los campos obligatorios.';
-      return;
-    }
-    this.svc.checkIn(
-      this.stay.id,
-      this.form.checkInDate,
-      this.form.checkInTime,
-      this.form.docNumber,
-      this.form.guests
-    );
-    this.router.navigate(['/dashboard/lodging', this.stay.id, 'checkin-confirm']);
+    this.errorMsg = this.validate();
+    if (this.errorMsg) return;
+    const r = this.r!;
+    const cleaning = this.cleaningRooms;
+    this.svc.checkIn(r.id, `${this.form.date}T${this.form.time}`, {
+      docNumber: this.form.docNumber.trim(),
+      adults: +this.form.adults, children: +this.form.children || 0, infants: +this.form.infants || 0,
+      observations: this.form.observations.trim(),
+    });
+    // La limpieza terminó en cuanto entra el huésped
+    cleaning.forEach(n => this.roomSvc.setManualStatus(n, null));
+    this.router.navigate(['/dashboard/lodging', r.id, 'checkin-confirm']);
   }
 }

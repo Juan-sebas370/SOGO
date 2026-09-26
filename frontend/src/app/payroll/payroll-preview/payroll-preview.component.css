@@ -1,5 +1,5 @@
 @import url('../payroll-list/payroll-list.component.css');
-@import url('../../billing/invoice-form/invoice-form.component.css');
+@import url('../../shared/styles/lines-page.css');
 
 .preview-summary {
   display:flex; gap:24px; flex-wrap:wrap;

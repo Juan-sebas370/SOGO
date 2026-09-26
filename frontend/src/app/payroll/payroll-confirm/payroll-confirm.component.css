@@ -1,4 +1,4 @@
-@import url('../../lodging/checkin-confirm/checkin-confirm.component.css');
+@import url('../../shared/styles/confirm-page.css');
 @import url('../payroll-list/payroll-list.component.css');
 
 .summary-row--net {

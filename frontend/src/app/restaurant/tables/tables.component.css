@@ -1,5 +1,5 @@
 @import url('../../shared/styles/list-page.css');
-@import url('../../lodging/lodging-list/lodging-list.component.css');
+@import url('../../shared/styles/tabs-page.css');
 
 /* Leyenda */
 .table-legend {

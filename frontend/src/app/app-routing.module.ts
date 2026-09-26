@@ -39,9 +39,11 @@ import { OrderDetailComponent } from './restaurant/order-detail/order-detail.com
 import { TablesComponent } from './restaurant/tables/tables.component';
 import { RestaurantReportsComponent } from './restaurant/restaurant-reports/restaurant-reports.component';
 import { InvoiceListComponent } from './billing/invoice-list/invoice-list.component';
-import { InvoiceFormComponent } from './billing/invoice-form/invoice-form.component';
+import { InvoiceNewComponent } from './billing/invoice-new/invoice-new.component';
 import { InvoiceDetailComponent } from './billing/invoice-detail/invoice-detail.component';
-import { InvoiceSendComponent } from './billing/invoice-send/invoice-send.component';
+import { InvoicePrintComponent } from './billing/invoice-print/invoice-print.component';
+import { BillingSettingsComponent } from './billing/billing-settings/billing-settings.component';
+import { billingPermission } from './billing/billing.guard';
 import { InvoiceReportsComponent } from './billing/invoice-reports/invoice-reports.component';
 import { TraListComponent } from './tra/tra-list/tra-list.component';
 import { TraFormComponent } from './tra/tra-form/tra-form.component';
@@ -50,9 +52,8 @@ import { TraPrintComponent } from './tra/tra-print/tra-print.component';
 import { TraReportsComponent } from './tra/tra-reports/tra-reports.component';
 import { LodgingListComponent } from './lodging/lodging-list/lodging-list.component';
 import { CheckinFormComponent } from './lodging/checkin-form/checkin-form.component';
-import { CheckinConfirmComponent } from './lodging/checkin-confirm/checkin-confirm.component';
 import { CheckoutFormComponent } from './lodging/checkout-form/checkout-form.component';
-import { CheckoutConfirmComponent } from './lodging/checkout-confirm/checkout-confirm.component';
+import { LodgingConfirmComponent } from './lodging/lodging-confirm/lodging-confirm.component';
 import { authGuard } from './auth.guard';
 import { roleGuard } from './role.guard';
 import { AccessDeniedComponent } from './access-denied/access-denied.component';
@@ -125,12 +126,12 @@ export const routes: Routes = [
       { path: 'restaurant/tables',                component: TablesComponent },
       { path: 'restaurant/reports',               component: RestaurantReportsComponent },
       // Facturación
-      { path: 'billing',                component: InvoiceListComponent },
-      { path: 'billing/new',            component: InvoiceFormComponent },
-      { path: 'billing/reports',        component: InvoiceReportsComponent },
-      { path: 'billing/:id',            component: InvoiceDetailComponent },
-      { path: 'billing/:id/edit',       component: InvoiceFormComponent },
-      { path: 'billing/:id/send',       component: InvoiceSendComponent },
+      { path: 'billing',                component: InvoiceListComponent,     canActivate: [billingPermission('Consultar facturas')] },
+      { path: 'billing/new',            component: InvoiceNewComponent,      canActivate: [billingPermission('Generar factura')] },
+      { path: 'billing/reports',        component: InvoiceReportsComponent,  canActivate: [billingPermission('Generar reportes')] },
+      { path: 'billing/settings',       component: BillingSettingsComponent, canActivate: [billingPermission('Configurar integración')] },
+      { path: 'billing/:id',            component: InvoiceDetailComponent,   canActivate: [billingPermission('Consultar facturas')] },
+      { path: 'billing/:id/corregir',   component: InvoiceNewComponent,      canActivate: [billingPermission('Validar datos fiscales')] },
       // TRA
       { path: 'tra',                component: TraListComponent },
       { path: 'tra/new',            component: TraFormComponent },
@@ -140,13 +141,15 @@ export const routes: Routes = [
       { path: 'tra/:id/print',      component: TraPrintComponent },
       // Alojamiento
       { path: 'lodging',                        component: LodgingListComponent },
+      // :id = id de la reserva (la estadía es parte de la reserva)
       { path: 'lodging/checkin',                component: CheckinFormComponent },
-      { path: 'lodging/:id',                    component: LodgingListComponent },
       { path: 'lodging/:id/checkin',            component: CheckinFormComponent },
-      { path: 'lodging/:id/checkin-confirm',    component: CheckinConfirmComponent },
+      { path: 'lodging/:id/checkin-confirm',    component: LodgingConfirmComponent, data: { kind: 'checkin' } },
       { path: 'lodging/:id/checkout',           component: CheckoutFormComponent },
-      { path: 'lodging/:id/checkout-confirm',   component: CheckoutConfirmComponent },
+      { path: 'lodging/:id/checkout-confirm',   component: LodgingConfirmComponent, data: { kind: 'checkout' } },
     ]
   },
+  // Impresión / PDF de una factura: fuera del layout del dashboard para imprimir solo la factura
+  { path: 'facturas/:id/imprimir', component: InvoicePrintComponent, canActivate: [authGuard, billingPermission('Descargar y enviar')] },
   { path: '**', redirectTo: '' }
 ];

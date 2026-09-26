@@ -1,7 +1,7 @@
 @import url('../reports-dashboard/reports-dashboard.component.css');
 @import url('../../shared/styles/form-page.css');
-@import url('../../billing/invoice-form/invoice-form.component.css');
-@import url('../../lodging/checkin-confirm/checkin-confirm.component.css');
+@import url('../../shared/styles/lines-page.css');
+@import url('../../shared/styles/confirm-page.css');
 
 /* ── Wizard stepper ───────────────────────────────── */
 .wizard-steps {

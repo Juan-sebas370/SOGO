@@ -5,12 +5,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
   Reservation, ReservationStatus, PaymentMethod, PaymentStatus,
-  paymentStatus, totalGuests, lodgingLabel, totalAmount, paidAmount, balance, lastPayment, isVoid
+  paymentStatus, totalGuests, lodgingLabel, totalAmount, paidAmount, balance, lastPayment, isVoid, isInHouse, awaitsCheckIn
 } from '../reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney, statusBadge, paymentBadge } from '../reservation-format';
 import { openConfirmation, openPaymentReceipt, guestMailto, downloadCsv } from '../reservation-documents';
 import { RoomService } from '../../lodging/room.service';
-import { Room } from '../../lodging/room.model';
+import { Room, bathroomLabel } from '../../lodging/room.model';
 import { Tra } from '../../tra/tra.model';
 import { isoDate } from '../../shared/date-utils';
 
@@ -66,7 +66,8 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
             </button>
             <div class="rd-popover" *ngIf="moreOpen">
               <button type="button" *ngIf="r.status === 'Pendiente'" (click)="setStatus('Confirmada')">Confirmar reserva</button>
-              <button type="button" *ngIf="canFinish" (click)="setStatus('Finalizada')">Marcar como finalizada</button>
+              <a *ngIf="canCheckIn" [routerLink]="['/dashboard/lodging', r.id, 'checkin']">Registrar check-in</a>
+              <a *ngIf="inHouse" [routerLink]="['/dashboard/lodging', r.id, 'checkout']">Registrar check-out</a>
               <button type="button" *ngIf="canNoShow" (click)="setStatus('No presentada')">Marcar como no presentada</button>
               <button type="button" (click)="copyCode()">{{ copied ? 'Código copiado ✓' : 'Copiar código' }}</button>
             </div>
@@ -155,7 +156,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
           </h2>
           <div class="rd-card-body rd-lodging">
             <div class="rd-lodging-main">
-              <img src="assets/casa.jpg" alt="" class="rd-lodging-img">
+              <img [src]="coverPhoto" [alt]="'Foto de ' + lodging(r)" class="rd-lodging-img">
               <div>
                 <strong class="rd-lodging-name">{{ lodging(r) }}</strong>
                 <p><span>Capacidad máxima:</span> {{ capacity }} personas</p>
@@ -167,7 +168,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
               <div class="rd-rooms-head">Distribución de habitaciones</div>
               <div class="rd-rooms-row" *ngFor="let room of rooms">
                 <strong>{{ room.number }}</strong>
-                <span>{{ room.type }} · {{ room.capacity }} persona{{ room.capacity === 1 ? '' : 's' }}</span>
+                <span>{{ room.beds.join(' + ') }} · baño {{ bath(room).toLowerCase() }}</span>
               </div>
             </div>
           </div>
@@ -324,7 +325,8 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
             <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
             Editar reserva
           </a>
-          <button type="button" class="rd-action rd-action--red" [disabled]="!editable" (click)="showCancel = true; cancelReason = ''">
+          <button type="button" class="rd-action rd-action--red" [disabled]="!canCancel" (click)="showCancel = true; cancelReason = ''"
+                  [title]="canCancel ? '' : (r.checkedInAt ? 'El huésped ya está alojado' : 'La reserva ya no está activa')">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             Cancelar reserva
           </button>
@@ -448,6 +450,7 @@ export class ReservationDetailComponent {
   readonly paymentBadge = paymentBadge;
   readonly guests = totalGuests;
   readonly lodging = lodgingLabel;
+  readonly bath = bathroomLabel;
   readonly openConfirmation = openConfirmation;
   readonly openPaymentReceipt = openPaymentReceipt;
 
@@ -500,6 +503,8 @@ export class ReservationDetailComponent {
   get pay(): PaymentStatus { return paymentStatus(this.r!); }
   get last() { return lastPayment(this.r!); }
   get traStatus() { return this.svc.traStatus(this.r!); }
+  /** Foto de la primera habitación reservada (portada de la tarjeta de alojamiento). */
+  get coverPhoto(): string { return this.rooms.length ? this.rooms[0].photos[0] : 'assets/casa.jpg'; }
   get capacity(): number { return this.rooms.reduce((s, room) => s + room.capacity, 0); }
   get mailto(): string { return guestMailto(this.r!); }
 
@@ -527,8 +532,11 @@ export class ReservationDetailComponent {
   }
 
   get canPay(): boolean { return !isVoid(this.r!) && this.pending > 0; }
-  get canFinish(): boolean { return this.r!.status === 'Confirmada' && this.r!.checkOut <= isoDate(0); }
-  get canNoShow(): boolean { return this.editable && this.r!.checkIn <= isoDate(0); }
+  get inHouse(): boolean { return isInHouse(this.r!); }
+  get canCheckIn(): boolean { return awaitsCheckIn(this.r!) && this.r!.checkIn <= isoDate(0) && this.r!.checkOut >= isoDate(0); }
+  get canNoShow(): boolean { return awaitsCheckIn(this.r!) && this.r!.checkIn <= isoDate(0); }
+  // Con el huésped alojado no se cancela: se registra su check-out
+  get canCancel(): boolean { return this.editable && !this.r!.checkedInAt; }
   get notesDirty(): boolean { return this.notes !== this.r!.observations; }
 
   docNumber(n: string): string {

@@ -3,7 +3,7 @@
    ===================================================== */
 @import url('../shared/styles/form-page.css');
 @import url('../users/user-list/user-list.component.css');
-@import url('../billing/invoice-form/invoice-form.component.css');
+@import url('../shared/styles/lines-page.css');
 
 /* ── Layout ───────────────────────────────────────── */
 .settings-page {}

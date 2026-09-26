@@ -1,6 +1,6 @@
 @import url('../../shared/styles/detail-page.css');
 @import url('../order-list/order-list.component.css');
-@import url('../../billing/invoice-form/invoice-form.component.css');
+@import url('../../shared/styles/lines-page.css');
 
 .font-bold { font-weight: 700; }
 .text-right { text-align: right; }

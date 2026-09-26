@@ -41,6 +41,9 @@ export interface Reservation {
   extrasAmount:    number;          // servicios adicionales
   payments:        Payment[];
   status:          ReservationStatus;
+  // Estadía real (Alojamiento): se llenan al registrar check-in / check-out
+  checkedInAt?:    string;          // YYYY-MM-DDTHH:mm
+  checkedOutAt?:   string;
   observations:    string;
   createdAt:       string;          // YYYY-MM-DDTHH:mm
   updatedAt:       string;
@@ -83,6 +86,16 @@ export function lodgingLabel(r: Reservation): string {
 /** Texto de la columna "Habitaciones": 102, 104 · P1 + P2 */
 export function roomsLabel(r: Reservation): string {
   return r.lodgingType === 'Casa completa' ? 'P1 + P2' : r.rooms.join(', ');
+}
+
+/** El huésped ya hizo check-in y todavía no ha salido. */
+export function isInHouse(r: Reservation): boolean {
+  return !!r.checkedInAt && !r.checkedOutAt;
+}
+
+/** Reserva activa que aún espera su check-in. */
+export function awaitsCheckIn(r: Reservation): boolean {
+  return (r.status === 'Confirmada' || r.status === 'Pendiente') && !r.checkedInAt;
 }
 
 /** Una reserva que ya no ocurrirá: no cuenta para ocupación, pagos ni llegadas. */

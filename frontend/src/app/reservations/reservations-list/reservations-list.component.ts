@@ -4,12 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
-  Reservation, ReservationStatus, ReservationType, LodgingType, PaymentStatus, ReservationTraStatus,
+  Reservation, ReservationStatus, ReservationType, LodgingType, PaymentStatus,
   paymentStatus, totalGuests, lodgingLabel, roomsLabel, isVoid, balance
 } from '../reservation.model';
-import { fmtDate, fmtShortDate, fmtMoney, typeBadge, statusBadge, paymentBadge, traBadge } from '../reservation-format';
+import { fmtDate, fmtShortDate, fmtMoney, typeBadge, statusBadge, paymentBadge } from '../reservation-format';
 import { downloadCsv } from '../reservation-documents';
 import { isoDate } from '../../shared/date-utils';
+import { TraService } from '../../tra/tra.service';
+import { TraViewStatus } from '../../tra/tra.model';
+import { TRA_VIEW_STATUSES, statusLabel as traLabel, statusBadge as traBadge } from '../../tra/tra-rules';
 
 type Tab = 'Todas' | 'Próximas' | 'Actuales' | 'Finalizadas' | 'Canceladas' | 'Pendientes de pago';
 
@@ -21,7 +24,7 @@ interface Filters {
   lodging: LodgingType | '';
   status: ReservationStatus | '';
   payment: PaymentStatus | '';
-  tra: ReservationTraStatus | '';
+  tra: TraViewStatus | '';
 }
 
 const EMPTY_FILTERS: Filters = { search: '', dateFrom: '', dateTo: '', type: '', lodging: '', status: '', payment: '', tra: '' };
@@ -218,7 +221,7 @@ const PAGE_SIZE = 10;
           <span class="rsv-select-label">TRA</span>
           <select [(ngModel)]="f.tra" (ngModelChange)="apply()">
             <option value="">Todos</option>
-            <option *ngFor="let o of traOptions" [value]="o">{{ o }}</option>
+            <option *ngFor="let o of traOptions" [value]="o">{{ traLabel(o) }}</option>
           </select>
         </span>
         <svg class="rsv-select-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
@@ -287,7 +290,7 @@ const PAGE_SIZE = 10;
             <td class="rsv-date-cell">{{ date(r.checkOut) }}</td>
             <td><span class="rsv-badge" [ngClass]="paymentBadge(pay(r))">{{ pay(r) }}</span></td>
             <td><span class="rsv-badge" [ngClass]="statusBadge(r.status)">{{ r.status }}</span></td>
-            <td><span class="rsv-badge" [ngClass]="traBadge(tra(r))">{{ tra(r) }}</span></td>
+            <td><a class="rsv-badge" [ngClass]="traBadge(tra(r))" [routerLink]="tra(r) === 'NO_APLICA' ? null : ['/dashboard/tra', r.id]">{{ traLabel(tra(r)) }}</a></td>
             <td class="rsv-col-actions">
               <div class="rsv-actions">
                 <a class="rsv-icon-btn rsv-icon-btn--view" [routerLink]="['/dashboard/reservations', r.id]" title="Ver detalle" aria-label="Ver detalle">
@@ -358,7 +361,7 @@ export class ReservationsListComponent {
   readonly lodgingOptions: LodgingType[] = ['Habitación', 'Piso', 'Casa completa'];
   readonly statusOptions: ReservationStatus[] = ['Confirmada', 'Pendiente', 'Finalizada', 'Cancelada', 'No presentada'];
   readonly paymentOptions: PaymentStatus[] = ['Pagado', 'Parcial', 'Pendiente'];
-  readonly traOptions: ReservationTraStatus[] = ['Completa', 'Pendiente', 'No aplica'];
+  readonly traOptions = TRA_VIEW_STATUSES;
   readonly cancelReasons = ['Cambio de planes del huésped', 'Solicitud del huésped', 'Error en la reserva', 'Otro'];
 
   // Plantilla: formateo compartido del módulo
@@ -369,11 +372,12 @@ export class ReservationsListComponent {
   readonly statusBadge = statusBadge;
   readonly paymentBadge = paymentBadge;
   readonly traBadge = traBadge;
+  readonly traLabel = traLabel;
   readonly pay = paymentStatus;
   readonly guests = totalGuests;
   readonly lodging = lodgingLabel;
   readonly roomsText = roomsLabel;
-  readonly tra = (r: Reservation) => this.svc.traStatus(r);
+  readonly tra = (r: Reservation) => this.traSvc.statusOf(r);
 
   all: Reservation[] = [];
   filtered: Reservation[] = [];
@@ -408,7 +412,7 @@ export class ReservationsListComponent {
     checkins: 0,
   };
 
-  constructor(private svc: ReservationService, private host: ElementRef<HTMLElement>) {
+  constructor(private svc: ReservationService, private traSvc: TraService, private host: ElementRef<HTMLElement>) {
     this.svc.getAll().subscribe(list => {
       this.all = [...list].sort((a, b) => b.code.localeCompare(a.code));
       this.selected.forEach(id => { if (!list.some(r => r.id === id)) this.selected.delete(id); });
@@ -482,7 +486,7 @@ export class ReservationsListComponent {
       (!this.f.lodging || r.lodgingType === this.f.lodging) &&
       (!this.f.status || r.status === this.f.status) &&
       (!this.f.payment || paymentStatus(r) === this.f.payment) &&
-      (!this.f.tra || this.svc.traStatus(r) === this.f.tra)
+      (!this.f.tra || this.tra(r) === this.f.tra)
     );
 
     // Los contadores de cada tab reflejan los filtros activos
@@ -574,7 +578,7 @@ export class ReservationsListComponent {
 
   exportCsv(rows: Reservation[]): void {
     this.exportOpen = false;
-    downloadCsv(rows, this.tra, `reservas-${this.today}.csv`);
+    downloadCsv(rows, r => traLabel(this.tra(r)), `reservas-${this.today}.csv`);
   }
 
   // ── Indicadores ──

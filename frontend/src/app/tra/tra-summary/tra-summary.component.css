@@ -1,0 +1,36 @@
+@import url('../../reservations/reservations.css');
+@import url('../tra.css');
+
+/* =====================================================
+   TRA — resumen y validación
+   ===================================================== */
+
+:host .rsv-header app-tra-stepper { align-self: center; }
+
+.ts-table { min-width: 980px; }
+.ts-nowrap { white-space: nowrap; }
+
+.ts-eyebrow { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7280; }
+.ts-code { display: block; margin: 2px 0 10px; font-size: 16px; }
+.ts-total { font-size: 15px !important; }
+
+.ts-plan { list-style: none; margin: 14px 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.ts-plan li { display: flex; gap: 12px; font-size: 11.5px; color: #6B7280; line-height: 1.5; }
+.ts-plan li > span {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: #E3EEFF;
+  color: #0B4A8B;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ts-plan strong { display: block; font-size: 12.5px; color: #0A2540; }
+.ts-plan code { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11.5px; }
+
+.ts-actions { display: flex; flex-direction: column; gap: 10px; }
+.ts-actions .rsv-btn { height: 46px; }
+.ts-hint { margin: -4px 0 0; text-align: center; font-size: 11.5px; color: #6B7280; }

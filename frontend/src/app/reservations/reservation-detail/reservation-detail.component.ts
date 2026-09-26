@@ -11,7 +11,8 @@ import { fmtDate, fmtDateTime, fmtMoney, statusBadge, paymentBadge } from '../re
 import { openConfirmation, openPaymentReceipt, guestMailto, downloadCsv } from '../reservation-documents';
 import { RoomService } from '../../lodging/room.service';
 import { Room } from '../../lodging/room.model';
-import { Tra } from '../../tra/tra.model';
+import { TraService, TraRow } from '../../tra/tra.service';
+import { Progress, progressOf, statusLabel as traLabel, statusBadge as traBadge } from '../../tra/tra-rules';
 import { isoDate } from '../../shared/date-utils';
 
 const STATUS_TEXT: Record<ReservationStatus, string> = {
@@ -216,31 +217,22 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Información del TRA
         </h2>
-        <div class="rd-card-body rd-tra" *ngIf="tra; else noTra">
-          <div><span>Código TRA</span><strong>{{ tra.code }}</strong></div>
-          <div><span>Estado</span>
-            <span class="rsv-badge rsv-badge--pill rd-sum-badge" [ngClass]="tra.status === 'Generada' ? 'rsv-badge--ok' : 'rsv-badge--warn'">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>{{ tra.status === 'Generada' ? 'Registrado' : tra.status }}
-            </span>
-          </div>
-          <div><span>Fecha de registro</span><strong>{{ dateTime(tra.generatedAt) }}</strong></div>
-          <div><span>Fecha de salida</span><strong>{{ date(tra.checkOutDate) }}</strong></div>
-          <div><span>No. de documento</span><strong>{{ docNumber(tra.docNumber) }}</strong></div>
-          <a class="rd-tra-link" [routerLink]="['/dashboard/tra', tra.id]">
+        <div class="rd-card-body rd-tra" *ngIf="hasTra && tra?.record as rec; else noTra">
+          <div><span>Estado</span><span class="rsv-badge" [ngClass]="traBadge(tra!.status)">{{ traLabel(tra!.status) }}</span></div>
+          <div><span>Huéspedes registrados</span><strong>{{ traProgress!.done }} / {{ traProgress!.expected }}</strong></div>
+          <div><span>Check-in confirmado</span><strong>{{ rec.checkInAt ? dateTime(rec.checkInAt) : '—' }}</strong></div>
+          <div><span>Envíos exitosos</span><strong>{{ rec.sends.length ? traSent + ' de ' + rec.sends.length : '—' }}</strong></div>
+          <div><span>ID MinCIT</span><strong>{{ traMincitId || '—' }}</strong></div>
+          <a class="rd-tra-link" [routerLink]="traLink">
             <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            <span><strong>Ver más información del TRA</strong>Consulta todos los detalles, movimientos y documentos en el módulo de TRA.</span>
+            <span *ngIf="traEditable"><strong>Registro de huéspedes</strong>Completa los datos de cada huésped antes del check-in.</span>
+            <span *ngIf="!traEditable"><strong>Ver trazabilidad de la TRA</strong>Envíos por huésped, respuestas del MinCIT e historial.</span>
             <svg class="rd-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
           </a>
         </div>
         <ng-template #noTra>
           <div class="rd-card-body rd-tra-empty">
-            <p *ngIf="traStatus === 'Pendiente'">Esta reserva aún no tiene un TRA registrado.</p>
-            <p *ngIf="traStatus === 'No aplica'">Esta reserva no requiere TRA ({{ r.reservationType === 'Evento / Pasadía' ? 'pasadía sin pernoctación' : 'reserva ' + r.status.toLowerCase() }}).</p>
-            <a class="rd-tra-link" *ngIf="traStatus === 'Pendiente'" routerLink="/dashboard/tra/new" [queryParams]="{ reserva: r.code }">
-              <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span><strong>Registrar TRA</strong>Se abrirá el formulario con los datos de esta reserva.</span>
-              <svg class="rd-chev" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-            </a>
+            <p>Esta reserva no requiere TRA ({{ r.reservationType === 'Evento / Pasadía' ? 'pasadía sin pernoctación' : 'reserva ' + r.status.toLowerCase() }}).</p>
           </div>
         </ng-template>
       </section>
@@ -259,11 +251,11 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
               <span class="rd-doc-date">{{ dateTime(r.createdAt) }}</span>
               <button type="button" class="rd-doc-btn" (click)="openConfirmation(r)">Ver</button>
             </li>
-            <li *ngIf="tra">
+            <li *ngIf="tra?.status === 'REPORTADA'">
               <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               <span class="rd-doc-name">Comprobante de envío TRA (PDF)</span>
-              <span class="rd-doc-date">{{ dateTime(tra.generatedAt) }}</span>
-              <a class="rd-doc-btn" [routerLink]="['/dashboard/tra', tra.id, 'print']">Ver</a>
+              <span class="rd-doc-date">{{ dateTime(tra!.record!.updatedAt) }}</span>
+              <a class="rd-doc-btn" [routerLink]="['/dashboard/tra', r.id]">Ver</a>
             </li>
           </ul>
         </section>
@@ -337,11 +329,10 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
             Generar reporte
           </a>
-          <a class="rd-action rd-action--blue" [class.disabled]="traStatus === 'No aplica'"
-             [routerLink]="traStatus === 'No aplica' ? null : (tra ? ['/dashboard/tra', tra.id] : '/dashboard/tra/new')"
-             [queryParams]="tra ? null : { reserva: r.code }" [attr.aria-disabled]="traStatus === 'No aplica'">
+          <a class="rd-action rd-action--blue" [class.disabled]="!hasTra"
+             [routerLink]="hasTra ? traLink : null" [attr.aria-disabled]="!hasTra">
             <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            {{ tra ? 'Ver / gestionar TRA' : 'Registrar TRA' }}
+            {{ traEditable ? 'Registrar huéspedes (TRA)' : 'Ver / gestionar TRA' }}
           </a>
         </div>
       </section>
@@ -450,9 +441,12 @@ export class ReservationDetailComponent {
   readonly lodging = lodgingLabel;
   readonly openConfirmation = openConfirmation;
   readonly openPaymentReceipt = openPaymentReceipt;
+  readonly traLabel = traLabel;
+  readonly traBadge = traBadge;
 
   r?: Reservation;
-  tra?: Tra;
+  tra?: TraRow;
+  traProgress?: Progress;
   rooms: Room[] = [];
 
   moreOpen = false;
@@ -471,6 +465,7 @@ export class ReservationDetailComponent {
   constructor(
     private svc: ReservationService,
     private roomSvc: RoomService,
+    private traSvc: TraService,
     private host: ElementRef<HTMLElement>,
     route: ActivatedRoute
   ) {
@@ -479,11 +474,14 @@ export class ReservationDetailComponent {
       const prev = this.r;
       this.r = this.svc.getById(id);
       if (!this.r) return;
-      this.tra = this.svc.traFor(this.r);
       const catalog = this.roomSvc.getSnapshot();
       this.rooms = catalog.filter(room => this.r!.rooms.includes(room.number));
       // Solo se reinicia el borrador de anotaciones al cargar, no en cada cambio (p. ej. al registrar un pago)
       if (!prev) this.notes = this.r.observations;
+    });
+    this.traSvc.getRows().subscribe(() => {
+      this.tra = this.traSvc.row(id);
+      this.traProgress = this.tra?.record && progressOf(this.tra.record, this.tra.reservation);
     });
   }
 
@@ -499,7 +497,11 @@ export class ReservationDetailComponent {
   get pending(): number { return balance(this.r!); }
   get pay(): PaymentStatus { return paymentStatus(this.r!); }
   get last() { return lastPayment(this.r!); }
-  get traStatus() { return this.svc.traStatus(this.r!); }
+  get hasTra(): boolean { return !!this.tra?.record && this.tra.status !== 'NO_APLICA'; }
+  get traEditable(): boolean { return !!this.tra?.record && this.traSvc.isEditable(this.tra.record); }
+  get traMincitId(): string | undefined { return this.tra?.record?.sends.find(s => s.mincitId)?.mincitId; }
+  get traSent(): number { return this.tra?.record?.sends.filter(s => s.status === 'EXITOSO').length ?? 0; }
+  get traLink(): string[] { return ['/dashboard/tra', this.r!.id, ...(this.traEditable ? ['registro'] : [])]; }
   get capacity(): number { return this.rooms.reduce((s, room) => s + room.capacity, 0); }
   get mailto(): string { return guestMailto(this.r!); }
 
@@ -575,6 +577,6 @@ export class ReservationDetailComponent {
   }
 
   exportExcel(): void {
-    downloadCsv([this.r!], r => this.svc.traStatus(r), `${this.r!.code}.csv`);
+    downloadCsv([this.r!], r => traLabel(this.traSvc.statusOf(r)), `${this.r!.code}.csv`);
   }
 }

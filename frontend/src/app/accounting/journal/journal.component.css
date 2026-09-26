@@ -1,5 +1,5 @@
 @import url('../voucher-list/voucher-list.component.css');
-@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../../shared/styles/report-page.css');
 
 .journal-date-row td { padding:0 !important; }
 

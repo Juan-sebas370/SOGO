@@ -1,6 +1,6 @@
 @import url('../../shared/styles/detail-page.css');
 @import url('../../lodging/lodging-list/lodging-list.component.css');
-@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../../shared/styles/report-page.css');
 @import url('../payroll-list/payroll-list.component.css');
 
 /* Métricas rápidas */

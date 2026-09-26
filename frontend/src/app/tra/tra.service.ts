@@ -1,86 +1,257 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { Tra } from './tra.model';
-import { isoDate } from '../shared/date-utils';
+import { ReservationService } from '../reservations/reservation.service';
+import { Reservation, isVoid } from '../reservations/reservation.model';
+import { isoDate, isoDateTime } from '../shared/date-utils';
+import { TraRecord, TraViewStatus, TraGuest, TraUnit, TraSend, TraEvent, TraSettings, LodgingUnit } from './tra.model';
+import { DEFAULT_UNITS } from './tra-catalogs';
+import { Validation, validate, draftFor, requiresTra, fullName, principalOf } from './tra-rules';
+import { TraGatewayService, GatewayResult } from './tra-gateway.service';
+import { seedRecords, defaultSettings } from './tra-seed';
 
-type TraSeed = Pick<Tra, 'fullName' | 'docNumber' | 'firstName' | 'lastName' | 'cityOfResidence' | 'travelReason' | 'transport'
-  | 'roomNumber' | 'roomType' | 'nights' | 'guests' | 'age' | 'status' | 'observations'> & { res: number; inOffset: number };
-
-// Cada TRA apunta a una reserva real de ReservationService (RSV-<año>-00108…),
-// con el mismo huésped, habitaciones y fechas relativas a hoy. De aquí sale el
-// estado "TRA" que muestran el listado y el detalle de reservas.
-function seed(): Tra[] {
-  const year = new Date().getFullYear();
-  const rows: TraSeed[] = [
-    { res: 118, inOffset: 0,   fullName: 'Juan Sebastián Pinilla', docNumber: '1120405060', firstName: 'Juan Sebastián', lastName: 'Pinilla',  cityOfResidence: 'Armenia',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '102, 104', roomType: '2 habitaciones', nights: 2, guests: 4,  age: '31', status: 'Pendiente', observations: 'Falta registrar acompañantes.' },
-    { res: 117, inOffset: -1,  fullName: 'Diego Ramírez',          docNumber: '1110304050', firstName: 'Diego',          lastName: 'Ramírez',  cityOfResidence: 'Pereira',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '301',      roomType: 'Hab. 301',       nights: 3, guests: 3,  age: '38', status: 'Generada',  observations: '' },
-    { res: 116, inOffset: -2,  fullName: 'Laura Torres',           docNumber: '1100203040', firstName: 'Laura',          lastName: 'Torres',   cityOfResidence: 'Bucaramanga', travelReason: 'Negocios', transport: 'Aéreo',     roomNumber: '203',      roomType: 'Hab. 203',       nights: 3, guests: 2,  age: '29', status: 'Generada',  observations: '' },
-    { res: 111, inOffset: -9,  fullName: 'Diana Pérez',            docNumber: '1050607080', firstName: 'Diana',          lastName: 'Pérez',    cityOfResidence: 'Medellín',    travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: '102, 104, 105, 106', roomType: 'Piso 1', nights: 2, guests: 5,  age: '42', status: 'Generada',  observations: '' },
-    { res: 110, inOffset: -12, fullName: 'Jorge Martínez',         docNumber: '1040506070', firstName: 'Jorge',          lastName: 'Martínez', cityOfResidence: 'Cali',        travelReason: 'Negocios', transport: 'Aéreo',     roomNumber: '105',      roomType: 'Hab. 105',       nights: 2, guests: 1,  age: '35', status: 'Generada',  observations: '' },
-    { res: 109, inOffset: -15, fullName: 'Andrés Villa',           docNumber: '1030405060', firstName: 'Andrés',         lastName: 'Villa',    cityOfResidence: 'Bogotá',      travelReason: 'Negocios', transport: 'Terrestre', roomNumber: '201, 203, 301', roomType: 'Piso 2',   nights: 2, guests: 5,  age: '45', status: 'Generada',  observations: '' },
-    { res: 108, inOffset: -20, fullName: 'Valentina Castro',       docNumber: '1020304050', firstName: 'Valentina',      lastName: 'Castro',   cityOfResidence: 'Pereira',     travelReason: 'Turismo',  transport: 'Terrestre', roomNumber: 'P1 + P2',  roomType: 'Casa completa',  nights: 2, guests: 18, age: '40', status: 'Generada',  observations: 'Grupo familiar.' },
-  ];
-  return rows.map(({ res, inOffset, ...t }, i) => ({
-    ...t,
-    id: String(i + 1),
-    code: `TRA-${String(851 - i).padStart(5, '0')}`,
-    reservationCode: `RSV-${year}-${String(res).padStart(5, '0')}`,
-    docType: 'Cédula de Ciudadanía',
-    nationality: 'Colombiana',
-    birthDate: `${year - Number(t.age)}-03-15`,
-    countryOfResidence: 'Colombia',
-    company: '',
-    checkInDate: isoDate(inOffset),
-    checkInTime: '15:00',
-    checkOutDate: isoDate(inOffset + t.nights),
-    checkOutTime: '11:00',
-    plan: 'Desayuno incluido',
-    travelPurpose: t.travelReason,
-    residenceCountry: 'Colombia',
-    generatedAt: `${isoDate(inOffset)}T15:20`,
-    generatedBy: 'Administrador',
-  }));
+/** Una fila del panel: la reserva con su TRA (las pasadías no tienen). */
+export interface TraRow {
+  reservation: Reservation;
+  record?:     TraRecord;
+  status:      TraViewStatus;
 }
 
+const clone = <T>(v: T): T => structuredClone(v);
+const now = () => { const d = new Date(); return `${isoDateTime(d)}:${String(d.getSeconds()).padStart(2, '0')}`; };
+const actor = () => localStorage.getItem('sogo_role') || 'Administrador';
+
+// Estado del módulo TRA. La TRA cuelga de la reserva (Reserva → TRA): cada
+// reserva que pernocta tiene su registro desde que se crea (borrador), y se
+// envía al MinCIT solo al confirmar el check-in (RN-05). Un fallo nunca borra
+// la TRA: queda en ERROR y se reintenta (RN-07).
 @Injectable({ providedIn: 'root' })
 export class TraService {
 
-  private data: Tra[] = seed();
+  private records = new Map<string, TraRecord>();
+  private reservations: Reservation[] = [];
+  private units: LodgingUnit[] = clone(DEFAULT_UNITS);
+  private settings: TraSettings = defaultSettings();
+  private catalogsSyncedAt = `${isoDate(0)}T07:35`;
+  private rows$ = new BehaviorSubject<TraRow[]>([]);
 
+  constructor(reservationService: ReservationService, private gateway: TraGatewayService) {
+    let seeded = false;
+    reservationService.getAll().subscribe(list => {
+      this.reservations = list;
+      if (!seeded) {
+        seedRecords(list, this.units).forEach(rec => this.records.set(rec.reservationId, rec));
+        seeded = true;
+      }
+      this.syncWithReservations();
+      this.emit();
+    });
+    // Reintentos automáticos con espera fija (en producción, un job del backend)
+    setInterval(() => this.runAutoRetries(), 60_000);
+  }
 
-  private tras$ = new BehaviorSubject<Tra[]>(this.data);
+  // ── Lectura ──────────────────────────────────────────
+  getRows(): Observable<TraRow[]> { return this.rows$.asObservable(); }
 
-  getAll(): Observable<Tra[]> { return this.tras$.asObservable(); }
-  getById(id: string): Tra | undefined { return this.data.find(t => t.id === id); }
+  row(reservationId: string): TraRow | undefined {
+    return this.rows$.value.find(r => r.reservation.id === reservationId);
+  }
 
-  create(t: Omit<Tra, 'id' | 'code' | 'generatedAt'>): Tra {
-    const next = Math.max(0, ...this.data.map(x => Number(x.code.split('-').pop()))) + 1;
-    const newT: Tra = {
-      ...t,
-      id: String(Date.now()),
-      code: `TRA-${String(next).padStart(5, '0')}`,
-      generatedAt: new Date().toISOString()
+  /** Copia editable del registro. */
+  draft(reservationId: string): TraRecord | undefined {
+    const rec = this.records.get(reservationId);
+    return rec && clone(rec);
+  }
+
+  /** Estado TRA de una reserva, para el módulo de Reservas. */
+  statusOf(r: Reservation): TraViewStatus {
+    return this.viewStatus(r, this.records.get(r.id));
+  }
+
+  getUnits(): LodgingUnit[] { return this.units; }
+  getSettings(): TraSettings { return this.settings; }
+  get catalogsSynced(): string { return this.catalogsSyncedAt; }
+
+  validation(reservationId: string, rec = this.records.get(reservationId)): Validation | undefined {
+    const r = this.reservations.find(x => x.id === reservationId);
+    return rec && r ? validate(rec, r, this.settings, this.units) : undefined;
+  }
+
+  /** El registro se edita hasta el primer envío; después solo se reenvía. */
+  isEditable(rec: TraRecord): boolean { return !rec.sends.length; }
+
+  /** RN-05: se envía en el check-in, nunca antes. */
+  checkInReached(r: Reservation): boolean { return r.checkIn <= isoDate(0); }
+
+  /** Próximo reintento automático de una TRA en error, si aún quedan intentos. */
+  nextRetry(rec: TraRecord): string | undefined {
+    const failedSends = rec.sends.filter(s => s.status === 'ERROR');
+    if (rec.status !== 'ERROR' || !this.settings.autoRetry || !failedSends.length) return undefined;
+    if (Math.max(...failedSends.map(s => s.attempts)) >= this.settings.maxAttempts) return undefined;
+    const last = failedSends.map(s => s.attemptAt ?? '').sort().pop()!;
+    const d = new Date(last);
+    d.setMinutes(d.getMinutes() + this.settings.retryMinutes);
+    return `${isoDateTime(d)}:00`;
+  }
+
+  // ── Registro de huéspedes ────────────────────────────
+  saveRegistration(reservationId: string, units: TraUnit[], guests: TraGuest[]): void {
+    const rec = this.records.get(reservationId);
+    if (!rec || !this.isEditable(rec)) return;
+    this.put({ ...rec, units: clone(units), guests: clone(guests), status: 'BORRADOR' },
+      this.event('Registro de huéspedes actualizado', `${guests.length} huésped${guests.length === 1 ? '' : 'es'} · ${actor()}`, 'muted'));
+  }
+
+  /** Validación previa (sección 6): deja la TRA lista para envío o en corrección. */
+  markValidated(reservationId: string): Validation | undefined {
+    const rec = this.records.get(reservationId);
+    const v = this.validation(reservationId);
+    if (!rec || !v || !this.isEditable(rec)) return v;
+    this.put({ ...rec, status: v.ok ? 'LISTA_PARA_ENVIO' : 'REQUIERE_CORRECCION' },
+      this.event(`Validación previa: ${v.passed} de ${v.checks.length}`, v.ok ? 'Lista para enviar en el check-in' : v.issues[0].message, v.ok ? 'info' : 'danger'));
+    return v;
+  }
+
+  // ── Envío al MinCIT ──────────────────────────────────
+  /** Confirma el check-in y envía: /one/ para el principal y /two/ por cada acompañante. */
+  async send(reservationId: string): Promise<void> {
+    const rec = this.records.get(reservationId);
+    const r = this.reservations.find(x => x.id === reservationId);
+    const v = this.markValidated(reservationId);
+    if (!rec || !r || !this.isEditable(rec) || !v?.ok || !this.checkInReached(r)) return;
+
+    const sends: TraSend[] = rec.guests.map((g, i) => ({ guestId: g.id, endpoint: i === 0 ? 'ONE' : 'TWO', status: 'PENDIENTE', attempts: 0 }));
+    this.put({ ...this.records.get(reservationId)!, sends, status: 'ENVIANDO', checkInAt: now(), sentBy: actor() },
+      this.event('Check-in confirmado', actor(), 'info'));
+    await this.transmit(reservationId, false);
+  }
+
+  /** Reenvía solo lo que no quedó EXITOSO (manual con "Reenviar" o automático). */
+  async retry(reservationId: string, auto = false): Promise<void> {
+    const rec = this.records.get(reservationId);
+    if (!rec || rec.status !== 'ERROR') return;
+    this.put({ ...rec, status: 'ENVIANDO' });
+    await this.transmit(reservationId, auto);
+  }
+
+  private async transmit(reservationId: string, auto: boolean): Promise<void> {
+    const label = auto ? 'Reintento automático · ' : '';
+    const guest = (id: string) => this.records.get(reservationId)!.guests.find(g => g.id === id)!;
+
+    const attempt = async (index: number, call: () => Promise<GatewayResult>): Promise<GatewayResult | undefined> => {
+      this.patchSend(reservationId, index, s => ({ ...s, status: s.attempts ? 'REINTENTO' : 'ENVIANDO' }));
+      let res: GatewayResult | undefined;
+      try { res = await call(); } catch { res = undefined; }
+      const ok = res?.httpStatus === 200;
+      const send = this.records.get(reservationId)!.sends[index];
+      const path = send.endpoint === 'ONE' ? '/one/' : '/two/';
+      this.patchSend(reservationId, index, s => ({
+        ...s, status: ok ? 'EXITOSO' : 'ERROR', attempts: s.attempts + 1, attemptAt: now(),
+        httpStatus: res?.httpStatus ?? 0, requestId: res?.requestId, message: res?.message ?? 'Sin respuesta del servidor',
+        durationMs: res?.durationMs, mincitId: res?.mincitId ?? s.mincitId,
+      }), this.event(`${label}POST ${path} · ${fullName(guest(send.guestId))} · ${res?.httpStatus ?? 'sin respuesta'}`,
+        ok ? (res?.mincitId ? `ID ${res.mincitId}` : 'Con ID del principal') : (res?.message ?? 'Sin respuesta del servidor'), ok ? 'ok' : 'danger'));
+      return ok ? res : undefined;
     };
-    this.data = [newT, ...this.data];
-    this.tras$.next(this.data);
-    return newT;
+
+    // 1. /one/: si falla, no se envía ningún /two/
+    let rec = this.records.get(reservationId)!;
+    if (rec.sends[0].status !== 'EXITOSO') {
+      const res = await attempt(0, () => this.gateway.sendPrincipal());
+      if (res) rec.sends.slice(1).forEach((_, i) => this.patchSend(reservationId, i + 1, s => ({ ...s, mincitId: res.mincitId })));
+    }
+    rec = this.records.get(reservationId)!;
+    const mincitId = rec.sends[0].mincitId;
+
+    // 2. /two/ por acompañante: un fallo solo deja en ERROR a ese acompañante
+    if (rec.sends[0].status === 'EXITOSO' && mincitId) {
+      for (let i = 1; i < rec.sends.length; i++) {
+        if (this.records.get(reservationId)!.sends[i].status !== 'EXITOSO') await attempt(i, () => this.gateway.sendCompanion(mincitId));
+      }
+    }
+
+    rec = this.records.get(reservationId)!;
+    const ok = rec.sends.filter(s => s.status === 'EXITOSO').length;
+    const all = rec.sends.length;
+    this.put({ ...rec, status: ok === all ? 'REPORTADA' : 'ERROR' }, ok === all
+      ? this.event('TRA reportada', `${ok} de ${all} exitosos`, 'ok')
+      : this.event('Error de envío', `${ok} de ${all} exitosos · la TRA local queda guardada`, 'danger'));
   }
 
-  update(id: string, changes: Partial<Tra>): void {
-    this.data = this.data.map(t => t.id === id ? { ...t, ...changes } : t);
-    this.tras$.next(this.data);
+  private runAutoRetries(): void {
+    const stamp = now();
+    this.records.forEach(rec => {
+      const next = this.nextRetry(rec);
+      if (next && next <= stamp) this.retry(rec.reservationId, true);
+    });
   }
 
-  annul(id: string): void { this.update(id, { status: 'Anulada' }); }
+  // ── Configuración ────────────────────────────────────
+  updateSettings(changes: Partial<TraSettings>): void {
+    this.settings = { ...this.settings, ...changes };
+    this.emit();
+  }
 
-  getStats() {
-    const total    = this.data.length;
-    const generated= this.data.filter(t => t.status === 'Generada').length;
-    const annulled = this.data.filter(t => t.status === 'Anulada').length;
-    const pending  = this.data.filter(t => t.status === 'Pendiente').length;
-    const guests   = this.data.reduce((a, t) => a + t.guests, 0);
-    const nights   = this.data.reduce((a, t) => a + t.nights, 0);
-    const avgNights= total > 0 ? (nights / total).toFixed(2) : '0';
-    return { total, generated, annulled, pending, guests, nights, avgNights };
+  async testConnection(): Promise<GatewayResult> {
+    const res = await this.gateway.testConnection();
+    this.updateSettings({ lastSync: isoDateTime(), integrationActive: res.httpStatus === 200 });
+    return res;
+  }
+
+  syncCatalogs(): void {
+    this.catalogsSyncedAt = isoDateTime();
+    this.emit();
+  }
+
+  saveUnit(unit: LodgingUnit): void {
+    const exists = this.units.some(u => u.id === unit.id);
+    this.units = exists ? this.units.map(u => u.id === unit.id ? clone(unit) : u) : [...this.units, clone(unit)];
+    this.emit();
+  }
+
+  // ── Interno ──────────────────────────────────────────
+  /** Cada reserva que pernocta tiene su TRA; mientras no se envíe, sigue las fechas de la reserva. */
+  private syncWithReservations(): void {
+    this.reservations.forEach(r => {
+      const rec = this.records.get(r.id);
+      if (!rec) {
+        if (!isVoid(r) && requiresTra(r)) this.records.set(r.id, draftFor(r, this.units, isoDateTime()));
+        return;
+      }
+      const p = principalOf(rec);
+      if (this.isEditable(rec) && (p.travel.checkIn !== r.checkIn || p.travel.checkOut !== r.checkOut)) {
+        p.travel = { ...p.travel, checkIn: r.checkIn, checkOut: r.checkOut };
+      }
+    });
+  }
+
+  /** Filas del panel: reservas vigentes, y las anuladas que ya alcanzaron a reportarse. */
+  private emit(): void {
+    const rows = this.reservations
+      .map((reservation): TraRow => {
+        const record = this.records.get(reservation.id);
+        return { reservation, record, status: this.viewStatus(reservation, record) };
+      })
+      .filter(row => !isVoid(row.reservation) || !!row.record?.sends.length)
+      .sort((a, b) => b.reservation.code.localeCompare(a.reservation.code));
+    this.rows$.next(rows);
+  }
+
+  /** Una reserva anulada antes de enviar su TRA ya no tiene nada que reportar. */
+  private viewStatus(r: Reservation, rec?: TraRecord): TraViewStatus {
+    return rec && (!isVoid(r) || rec.sends.length) ? rec.status : 'NO_APLICA';
+  }
+
+  private put(rec: TraRecord, event?: TraEvent): void {
+    this.records.set(rec.reservationId, event ? { ...rec, history: [event, ...rec.history], updatedAt: event.at } : rec);
+    this.emit();
+  }
+
+  private patchSend(reservationId: string, index: number, fn: (s: TraSend) => TraSend, event?: TraEvent): void {
+    const rec = this.records.get(reservationId)!;
+    this.put({ ...rec, sends: rec.sends.map((s, i) => i === index ? fn(s) : s) }, event);
+  }
+
+  private event(title: string, detail: string, tone: TraEvent['tone']): TraEvent {
+    return { at: now(), title, detail, tone };
   }
 }

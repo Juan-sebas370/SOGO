@@ -43,11 +43,11 @@ import { InvoiceFormComponent } from './billing/invoice-form/invoice-form.compon
 import { InvoiceDetailComponent } from './billing/invoice-detail/invoice-detail.component';
 import { InvoiceSendComponent } from './billing/invoice-send/invoice-send.component';
 import { InvoiceReportsComponent } from './billing/invoice-reports/invoice-reports.component';
-import { TraListComponent } from './tra/tra-list/tra-list.component';
-import { TraFormComponent } from './tra/tra-form/tra-form.component';
+import { TraPanelComponent } from './tra/tra-panel/tra-panel.component';
+import { TraRegistrationComponent } from './tra/tra-registration/tra-registration.component';
+import { TraSummaryComponent } from './tra/tra-summary/tra-summary.component';
 import { TraDetailComponent } from './tra/tra-detail/tra-detail.component';
-import { TraPrintComponent } from './tra/tra-print/tra-print.component';
-import { TraReportsComponent } from './tra/tra-reports/tra-reports.component';
+import { TraConfigComponent } from './tra/tra-config/tra-config.component';
 import { LodgingListComponent } from './lodging/lodging-list/lodging-list.component';
 import { CheckinFormComponent } from './lodging/checkin-form/checkin-form.component';
 import { CheckinConfirmComponent } from './lodging/checkin-confirm/checkin-confirm.component';
@@ -131,13 +131,12 @@ export const routes: Routes = [
       { path: 'billing/:id',            component: InvoiceDetailComponent },
       { path: 'billing/:id/edit',       component: InvoiceFormComponent },
       { path: 'billing/:id/send',       component: InvoiceSendComponent },
-      // TRA
-      { path: 'tra',                component: TraListComponent },
-      { path: 'tra/new',            component: TraFormComponent },
-      { path: 'tra/reports',        component: TraReportsComponent },
+      // TRA (:id = id de la reserva: la TRA cuelga de ella)
+      { path: 'tra',                component: TraPanelComponent },
+      { path: 'tra/config',         component: TraConfigComponent },
       { path: 'tra/:id',            component: TraDetailComponent },
-      { path: 'tra/:id/edit',       component: TraFormComponent },
-      { path: 'tra/:id/print',      component: TraPrintComponent },
+      { path: 'tra/:id/registro',   component: TraRegistrationComponent },
+      { path: 'tra/:id/resumen',    component: TraSummaryComponent },
       // Alojamiento
       { path: 'lodging',                        component: LodgingListComponent },
       { path: 'lodging/checkin',                component: CheckinFormComponent },

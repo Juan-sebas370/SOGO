@@ -1,0 +1,58 @@
+/* =====================================================
+   TRA — piezas básicas del módulo: avisos, etiquetas,
+   texto auxiliar y botón pequeño. Las usan todas las
+   pantallas, incluido el panel (que no necesita tra.css).
+   ===================================================== */
+
+/* ── Avisos ───────────────────────────────────────── */
+.tra-alert {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  border: 1px solid;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.tra-alert > svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tra-alert-body { flex: 1; min-width: 0; }
+.tra-alert-body strong { display: block; font-size: 13px; }
+.tra-alert-body ul { margin: 4px 0 0; padding-left: 18px; }
+.tra-alert-actions { display: flex; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+
+.tra-alert--danger { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+.tra-alert--warn   { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+.tra-alert--info   { background: #EFF6FF; border-color: #BFDBFE; color: #1E40AF; }
+.tra-alert--ok     { background: #F0FDF4; border-color: #BBF7D0; color: #166534; }
+
+/* ── Etiquetas y texto auxiliar ───────────────────── */
+.tra-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #EEF1F5;
+  color: #4B5563;
+  font-size: 9.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.tra-tag--blue { background: #E3EEFF; color: #1D4ED8; }
+
+.tra-mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 11.5px; }
+.tra-muted { color: #6B7280; }
+.tra-missing { color: #B91C1C; font-weight: 600; }
+.tra-sub { display: block; margin-top: 2px; font-size: 10.5px; color: #6B7280; white-space: nowrap; }
+
+/* ── Botón pequeño ────────────────────────────────── */
+.rsv-btn--sm { height: 32px; padding: 0 12px; font-size: 12px; }
+.rsv-btn--block { width: 100%; }
+
+@media (max-width: 760px) {
+  .tra-alert { flex-wrap: wrap; }
+}

@@ -1,0 +1,164 @@
+/* =====================================================
+   TRA — base común del módulo. Se usa junto con el
+   sistema rsv-* de Reservas (botones, badges, panel,
+   modal, campos), que cada pantalla importa antes:
+     @import url('../../reservations/reservations.css');
+   ===================================================== */
+
+@import url('./tra-base.css');
+
+/* ── Layout principal + barra lateral ─────────────── */
+.tra-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+.tra-main, .tra-aside { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.tra-aside { position: sticky; top: 16px; }
+
+/* ── Tarjetas ─────────────────────────────────────── */
+.tra-card {
+  background: #fff;
+  border: 1px solid #E6EBF2;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04);
+  padding: 20px 22px;
+  min-width: 0;
+}
+
+.tra-card--flush { padding: 0; overflow: hidden; }
+.tra-card--flush > .tra-card-head { padding: 20px 22px 14px; margin: 0; }
+
+.tra-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tra-card-title { margin: 0; font-size: 15px; font-weight: 700; color: #0A2540; }
+.tra-card-sub   { margin: 3px 0 0; font-size: 11.5px; color: #6B7280; }
+.tra-card-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+
+.tra-section-label {
+  margin: 18px 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0B6FD0;
+}
+
+.tra-section-label small { font-weight: 500; letter-spacing: 0; text-transform: none; color: #6B7280; }
+
+/* ── Resumen de la reserva (franja) ───────────────── */
+.tra-strip {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.tra-strip > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.tra-strip > div > span:first-child { font-size: 11px; color: #6B7280; }
+.tra-strip strong { font-size: 13px; font-weight: 600; color: #0A2540; }
+.tra-strip .rsv-badge { align-self: flex-start; }
+.tra-strip app-tra-stepper { margin-left: auto; }
+
+.tra-note {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  color: #1E3A8A;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.tra-note svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Campos ───────────────────────────────────────── */
+.tra-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 14px; }
+.tra-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tra-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tra-span-2 { grid-column: span 2; }
+
+.rsv-field > label .tra-tag { margin-left: 4px; }
+.rsv-field small { font-size: 10.5px; color: #6B7280; }
+.rsv-field small.tra-missing { font-weight: 500; }
+:host .rsv-input:disabled, :host .rsv-input[readonly] { background: #F4F7FB; color: #4B5563; }
+:host .rsv-input.invalid { border-color: #F87171; background: #FFFBFB; }
+
+/* Casilla con texto */
+.tra-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: #1F2937;
+  cursor: pointer;
+}
+
+.tra-check input { width: 16px; height: 16px; margin: 0; accent-color: #0B6FD0; cursor: pointer; }
+.tra-check small { color: #6B7280; font-size: 11px; }
+
+/* ── Lista de verificación ────────────────────────── */
+.tra-checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+.tra-checkitem {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #E6EBF2;
+  border-radius: 10px;
+}
+
+.tra-checkitem.fail { background: #FEF7F7; border-color: #FCA5A5; }
+.tra-checkitem strong { display: block; font-size: 12.5px; font-weight: 600; color: #0A2540; }
+.tra-checkitem span { font-size: 11px; color: #6B7280; }
+
+.tra-icon { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tra-icon--ok     { stroke: #16A34A; }
+.tra-icon--danger { stroke: #DC2626; }
+
+/* ── Datos clave (definición) ─────────────────────── */
+.tra-dl { margin: 0; display: flex; flex-direction: column; }
+.tra-dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #F1F4F8; font-size: 12px; }
+.tra-dl > div:last-child { border-bottom: none; }
+.tra-dl dt { color: #6B7280; }
+.tra-dl dd { margin: 0; font-weight: 600; color: #0A2540; text-align: right; }
+
+/* ── Tabla compacta ───────────────────────────────── */
+.tra-table-wrap { overflow-x: auto; }
+
+.tra-table { width: 100%; border-collapse: collapse; }
+.tra-table th {
+  padding: 11px 12px;
+  background: #F4F7FB;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1F2937;
+  white-space: nowrap;
+}
+.tra-table td { padding: 11px 12px; border-top: 1px solid #EEF1F5; font-size: 12px; color: #1F2937; vertical-align: middle; }
+.tra-table tr.fail td { background: #FEF7F7; }
+
+.tra-empty { padding: 28px 12px; text-align: center; font-size: 12.5px; color: #6B7280; }
+
+@media (max-width: 1200px) {
+  .tra-layout { grid-template-columns: 1fr; }
+  .tra-aside { position: static; }
+}
+
+@media (max-width: 760px) {
+  .tra-grid, .tra-grid--4, .tra-checks { grid-template-columns: 1fr; }
+  .tra-span-2 { grid-column: auto; }
+  .tra-strip { gap: 16px; }
+  .tra-strip app-tra-stepper { margin-left: 0; }
+}

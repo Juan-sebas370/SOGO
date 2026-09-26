@@ -1,4 +1,4 @@
-@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../../shared/styles/report-page.css');
 @import url('../product-list/product-list.component.css');
 
 .report-grid {

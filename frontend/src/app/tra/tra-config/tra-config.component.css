@@ -1,0 +1,109 @@
+@import url('../../reservations/reservations.css');
+@import url('../tra.css');
+
+/* =====================================================
+   TRA — configuración
+   ===================================================== */
+
+.tc-saved { font-size: 12px; font-weight: 600; color: #15803D; }
+.tc-right { text-align: right !important; }
+.tc-nowrap { white-space: nowrap; }
+
+.tc-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tc-test { margin-bottom: 14px; padding: 10px 14px; }
+
+/* Datos de la integración */
+.tc-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+
+.tc-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #E6EBF2;
+  border-radius: 10px;
+  min-width: 0;
+}
+
+.tc-tile > span, .tc-tile > label { font-size: 11px; color: #6B7280; margin: 0; }
+.tc-tile strong { font-size: 13px; color: #0A2540; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-ok  { color: #15803D !important; }
+.tc-err { color: #B91C1C !important; }
+
+:host .tc-tile-input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-bottom: 1px dashed #D5DEEA;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0A2540;
+  outline: none;
+  box-shadow: none;
+}
+
+:host .tc-tile-input:focus { border-bottom-color: #0B6FD0; }
+
+.tc-fieldset { margin: 0; padding: 0; border: none; min-width: 0; }
+
+/* Tipos de unidad */
+.tc-type--CASA_COMPLETA { background: #F1E8FF; color: #7E22CE; }
+.tc-type--PISO          { background: #E3EEFF; color: #1D4ED8; }
+
+/* Interruptores */
+.tc-switches { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; }
+.tc-switches li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #F1F4F8; }
+.tc-switches li:last-child { border-bottom: none; }
+.tc-switches strong { display: block; font-size: 12.5px; color: #0A2540; }
+.tc-switches span { font-size: 11px; color: #6B7280; }
+
+.tc-switch {
+  position: relative;
+  width: 38px; height: 22px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: #D1D5DB;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tc-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.tc-switch.on { background: #0B6FD0; }
+.tc-switch.on::after { transform: translateX(16px); }
+.tc-switch.locked { opacity: 0.6; cursor: default; }
+
+.tc-inline select {
+  padding: 1px 2px;
+  border: 1px solid #D5DEEA;
+  border-radius: 5px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+}
+
+/* Catálogos y seguridad */
+.tc-catalogs, .tc-security { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.tc-catalogs li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; font-size: 12px; }
+.tc-security li { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #374151; }
+.tc-small { margin: 0; font-size: 10.5px; color: #6B7280; line-height: 1.5; }
+
+/* Modales */
+.tc-modal { max-width: 520px; }
+.tc-check-inline { height: 40px; }
+.tc-rooms { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.tc-steps { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; line-height: 1.55; color: #374151; }
+
+@media (max-width: 900px) {
+  .tc-tiles { grid-template-columns: 1fr 1fr; }
+}

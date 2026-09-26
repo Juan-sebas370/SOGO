@@ -8,6 +8,7 @@ import { RoomService } from '../lodging/room.service';
 import { RoomWithStatus } from '../lodging/room.model';
 import { InvoiceService } from '../billing/invoice.service';
 import { InventoryService } from '../inventory/inventory.service';
+import { TraService, TraRow } from '../tra/tra.service';
 
 // Única fuente de verdad para "qué necesita atención": antes esta lógica vivía
 // solo dentro de dashboard-home.component.ts, así que la campana de
@@ -17,6 +18,7 @@ import { InventoryService } from '../inventory/inventory.service';
 export class NotificationService {
   private reservations: Reservation[] = [];
   private rooms: RoomWithStatus[] = [];
+  private traRows: TraRow[] = [];
   private notifications$ = new BehaviorSubject<AppNotification[]>([]);
 
   constructor(
@@ -25,6 +27,7 @@ export class NotificationService {
     private roomService: RoomService,
     private invoiceService: InvoiceService,
     private inventoryService: InventoryService,
+    private traService: TraService,
   ) {
     this.reservationService.getAll().subscribe(list => {
       this.reservations = list;
@@ -32,6 +35,10 @@ export class NotificationService {
     });
     this.roomService.getAll().subscribe(list => {
       this.rooms = list;
+      this.refresh();
+    });
+    this.traService.getRows().subscribe(rows => {
+      this.traRows = rows;
       this.refresh();
     });
   }
@@ -45,7 +52,8 @@ export class NotificationService {
     const invoiceStats = this.invoiceService.getStats();
     const departuresCount = this.stayService.getDepartures().length;
     const pendingReservations = this.reservations.filter(r => r.status === 'Pendiente').length;
-    const traPending = this.reservations.filter(r => r.status === 'Confirmada' && this.reservationService.traStatus(r) === 'Pendiente').length;
+    const traErrors = this.traRows.filter(t => t.status === 'ERROR').length;
+    const traToFix = this.traRows.filter(t => t.status === 'REQUIERE_CORRECCION').length;
     const cleaningRooms = this.rooms.filter(r => r.status === 'En limpieza');
     const maintenanceRooms = this.rooms.filter(r => r.status === 'Mantenimiento');
 
@@ -60,8 +68,11 @@ export class NotificationService {
     maintenanceRooms.forEach(r => {
       list.push({ icon: 'maintenance', level: 'Alta', label: 'Habitación en mantenimiento', detail: `Habitación ${r.number} · Piso ${r.floor}`, link: '/dashboard/lodging' });
     });
-    if (traPending > 0) {
-      list.push({ icon: 'review', level: 'Media', label: 'TRA pendientes', detail: `${traPending} reserva(s) confirmada(s) sin TRA`, link: '/dashboard/reservations' });
+    if (traErrors > 0) {
+      list.push({ icon: 'review', level: 'Alta', label: 'TRA con error de envío', detail: `${traErrors} TRA sin reportar al MinCIT`, link: '/dashboard/tra' });
+    }
+    if (traToFix > 0) {
+      list.push({ icon: 'review', level: 'Media', label: 'TRA por corregir', detail: `${traToFix} TRA con datos faltantes`, link: '/dashboard/tra' });
     }
     if (pendingReservations > 0) {
       list.push({ icon: 'review', level: 'Baja', label: 'Reservas por confirmar', detail: `${pendingReservations} reserva(s) pendientes`, link: '/dashboard/reservations' });

@@ -1,0 +1,43 @@
+/* Inventarios: piezas propias (el resto viene de shared/styles/kit.css) */
+.inv-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.inv-tabs button { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: none; border-radius: 999px; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #1F2937; cursor: pointer; }
+.inv-tabs button span { min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #EEF1F5; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.inv-tabs button.active { background: #0A3D6D; color: #fff; }
+.inv-tabs button.active span { background: #1F5A8E; }
+.inv-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+.inv-filters .kit-search input { height: 46px; }
+.inv-cat { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 600; background: #EEF1F5; color: #374151; margin-top: 3px; }
+.inv-cat--alimentos { background: #DDF7E6; color: #15803D; }
+.inv-cat--bebidas { background: #E3EEFF; color: #1D4ED8; }
+.inv-cat--aseo { background: #D5F5F1; color: #0F766E; }
+.inv-cat--amenities { background: #F1E8FF; color: #7E22CE; }
+.inv-cat--lencería { background: #FDE2EC; color: #BE185D; }
+.inv-cat--papelería { background: #EEF1F5; color: #4B5563; }
+.inv-cat--mantenimiento { background: #FFEDD5; color: #C2410C; }
+.inv-row-warn td { background: #FFFBF4; }
+.inv-row-danger td { background: #FFF8F8; }
+.inv-sub { display: block; font-size: 11px; color: #6B7280; }
+.inv-section-title { margin: 0 0 14px; font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #0B6FD0; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 14px; }
+.inv-grid .wide { grid-column: 1 / -1; }
+.inv-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.inv-hint { font-size: 11px; font-weight: 400; color: #6B7280; }
+.inv-was { font-size: 11px; font-weight: 400; color: #0B6FD0; }
+.inv-ok { border-color: #86D5A5 !important; }
+.inv-check { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; margin: 8px 0; }
+.inv-check svg { width: 17px; height: 17px; fill: none; stroke-width: 2; flex-shrink: 0; margin-top: 1px; }
+.inv-check.ok svg { stroke: #16A34A; } .inv-check.bad svg { stroke: #DC2626; }
+.inv-check small { display: block; color: #B91C1C; font-size: 11px; }
+.inv-qty { width: 96px; text-align: right; }
+.inv-green { color: #15803D; font-weight: 700; } .inv-red { color: #B91C1C; font-weight: 700; }
+.inv-mov { display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; border: 1px solid #E6EBF2; border-radius: 10px; margin-bottom: 8px; font-size: 12px; }
+.inv-mov strong { display: block; color: #0A2540; }
+.inv-mov small { font-family: ui-monospace, 'Consolas', monospace; font-size: 10.5px; color: #6B7280; }
+.inv-head-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.inv-head-row .kit-card-title { margin: 0; }
+.inv-picker { position: relative; min-width: 280px; }
+.inv-picker ul { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); list-style: none; margin: 0; padding: 6px; background: #fff; border: 1px solid #E6EBF2; border-radius: 12px; box-shadow: 0 12px 32px rgba(10,61,109,0.16); max-height: 300px; overflow-y: auto; }
+.inv-picker li button { width: 100%; display: flex; justify-content: space-between; gap: 8px; padding: 8px; border: none; border-radius: 8px; background: none; font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.inv-picker li button:hover { background: #F2F7FD; }
+.inv-picker li.none { padding: 8px; font-size: 12px; color: #6B7280; }
+.inv-remove { border: none; background: none; font-size: 18px; color: #6B7280; cursor: pointer; }

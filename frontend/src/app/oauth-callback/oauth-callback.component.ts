@@ -35,6 +35,8 @@ export class OAuthCallbackComponent implements OnInit {
     localStorage.setItem('sogo_token', token);
     localStorage.setItem('sogo_role', role || '');
     localStorage.setItem('sogo_username', username || '');
+    localStorage.setItem('sogo_fullname', params.get('fullName') || '');
+    localStorage.setItem('sogo_email', params.get('email') || '');
     this.router.navigate(['/dashboard']);
   }
 }

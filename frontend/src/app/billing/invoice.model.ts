@@ -5,7 +5,9 @@
 // estado de pago se derivan; nunca se guardan aparte.
 // =====================================================
 
-export type ConceptCategory = 'Alojamiento' | 'Restaurante' | 'Minibar' | 'Lavandería' | 'Eventos y pasadías' | 'Otro';
+// Daños y faltantes: dotación que el huésped perdió o dañó (Inventarios › Dotación de la casa).
+// Restaurante y Minibar quedan por compatibilidad: el hospedaje no vende comidas ni bebidas.
+export type ConceptCategory = 'Alojamiento' | 'Daños y faltantes' | 'Restaurante' | 'Minibar' | 'Lavandería' | 'Eventos y pasadías' | 'Otro';
 export type TaxKind = 'IVA' | 'INC';
 export type DianStatus = 'Borrador' | 'En validación' | 'Aceptada' | 'Rechazada';
 /** Estado que ve el usuario en el listado (combina emisión, pagos y anulación). */
@@ -33,7 +35,7 @@ export interface InvoiceLine {
   id:            string;
   category:      ConceptCategory;
   description:   string;             // "Alojamiento · Casa completa"
-  detail:        string;             // "Reserva RSV-2026-00118", "Comanda R-2291"...
+  detail:        string;             // "Reserva RSV-2026-00118", "Piso 2 · check-out"...
   dateLabel:     string;             // "22–25/09"
   quantity:      number;
   unitLabel:     string;             // "noches", "" ...
@@ -43,7 +45,7 @@ export interface InvoiceLine {
   taxKind:       TaxKind;
   taxRate:       number;             // 0.19, 0.08, 0 (exento)
   included:      boolean;            // desmarcada = no se factura (p. ej. cobrada aparte en caja)
-  chargeId?:     string;             // consumo de origen (Restaurante / Inventario / manual)
+  chargeId?:     string;             // consumo de origen (dotación, lavandería, manual)
 }
 
 export interface InvoiceEvent {
@@ -55,7 +57,7 @@ export interface InvoiceEvent {
 
 export interface Invoice {
   id:                 string;
-  number:             string;        // "" mientras es borrador; FE-1048 al emitir
+  number:             string;        // "" mientras es borrador; el servidor lo asigna al emitir (prefijo-consecutivo)
   reservationId:      string;
   reservationCode:    string;
   billTo:             'Huésped' | 'Empresa';
@@ -65,11 +67,14 @@ export interface Invoice {
   dueDate:            string;        // YYYY-MM-DD
   dianStatus:         DianStatus;
   issuedAt?:          string;
+  issuedBy?:          string;
+  createdBy?:         string;
+  dianValidatedAt?:   string;        // fecha en que se registró la aceptación de la DIAN
   fiscalValidatedAt?: string;
   cufe?:              string;
   rejectionReason?:   string;
   sentVia?:           { channel: 'Correo' | 'WhatsApp'; at: string; to: string };
-  annulment?:         { creditNote: string; reason: string; at: string };
+  annulment?:         { creditNote: string; reason: string; at: string; by?: string };
   events:             InvoiceEvent[];
 }
 
@@ -206,3 +211,27 @@ export const LOCATIONS: Record<string, string[]> = {
   'Huila':           ['Neiva', 'Pitalito'],
   'Nariño':          ['Pasto', 'Ipiales'],
 };
+
+// ── CUFE ─────────────────────────────────────────────
+
+/** Consulta pública de una factura en la DIAN (la misma dirección del código QR). */
+export const dianLookupUrl = (cufe: string) => `https://catalogo-vpfe.dian.gov.co/document/searchqr?documentkey=${cufe}`;
+
+/**
+ * CUFE tal como se pega (el servidor hace lo mismo): sin espacios ni saltos de línea, en minúsculas;
+ * si se pega el enlace del código QR de la DIAN (…?documentkey=CUFE) se toma solo el CUFE.
+ * Devuelve el CUFE limpio y, si no sirve, por qué.
+ */
+export function checkCufe(text: string): { value: string; error: string } {
+  let t = (text ?? '').replace(/\s+/g, '');
+  const k = t.toLowerCase().indexOf('documentkey=');
+  if (k >= 0) t = t.slice(k + 'documentkey='.length).split('&')[0];
+  const found = t.length > 96 ? t.match(/[0-9a-f]{96}/i)?.[0] : undefined;
+  const value = (found ?? t).toLowerCase();
+  if (!value) return { value, error: '' };
+  const bad = [...new Set(value.replace(/[0-9a-f]/g, '').split(''))];
+  if (bad.length) return { value, error: `Tiene caracteres que no van en un CUFE (${bad.slice(0, 5).join(' ')}): solo se usan números 0-9 y letras a-f.` };
+  if (value.length < 96) return { value, error: `Le faltan ${96 - value.length} caracteres: el CUFE tiene exactamente 96. Revisa que lo hayas copiado completo.` };
+  if (value.length > 96) return { value, error: `Le sobran ${value.length - 96} caracteres: el CUFE tiene exactamente 96. Copia solo el código.` };
+  return { value, error: '' };
+}

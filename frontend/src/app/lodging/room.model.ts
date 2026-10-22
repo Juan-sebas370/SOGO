@@ -13,6 +13,8 @@ export interface Room {
   bathroom:        BathroomType;
   sharesBathWith?: string;        // número de la habitación con la que comparte baño
   pricePerNight:   number;        // tarifa base "desde"
+  pricePerNightMid?:  number;     // tarifa por noche en temporada media (pricePerNight es la baja)
+  pricePerNightHigh?: number;     // tarifa por noche en temporada alta
   description:     string;
   services:        string[];
   photos:          string[];      // rutas bajo assets/; la primera es la portada

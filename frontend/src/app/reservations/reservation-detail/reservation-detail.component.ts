@@ -120,6 +120,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
             <dl class="rd-fields">
               <div><dt>Código de reserva</dt><dd>{{ r.code }}</dd></div>
               <div><dt>Tipo de reserva</dt><dd>{{ r.reservationType }}</dd></div>
+              <div><dt>Canal</dt><dd>{{ r.channel }}</dd></div>
               <div><dt>Fecha de creación</dt><dd>{{ dateTime(r.createdAt) }}</dd></div>
               <div><dt>Estado</dt><dd><span class="rsv-badge rsv-badge--pill" [ngClass]="statusBadge(r.status)">{{ r.status }}</span></dd></div>
             </dl>
@@ -327,7 +328,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
             <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             Registrar pago
           </button>
-          <a class="rd-action rd-action--purple" routerLink="/dashboard/reports/generator">
+          <a class="rd-action rd-action--purple" routerLink="/dashboard/reports/reservations">
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg>
             Generar reporte
           </a>

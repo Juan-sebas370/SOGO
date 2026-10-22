@@ -23,12 +23,13 @@ import { amountInWords } from '../number-words';
 
     <header class="sheet-head">
       <div class="sheet-issuer">
-        <span class="sheet-logo">[LOGO]</span>
+        <span class="sheet-logo"><img [src]="issuer.logo" [alt]="'Logo de ' + issuer.name"></span>
         <div>
           <strong>{{ issuer.name }}</strong>
-          <span>NIT {{ issuer.nit }} · Vivienda turística · RNT {{ issuer.rnt }}</span>
-          <span>{{ issuer.address }} · {{ issuer.city }}</span>
-          <span>{{ issuer.phone }} · {{ issuer.email }}</span>
+          <span *ngIf="issuer.legalName && issuer.legalName !== issuer.name">{{ issuer.legalName }}</span>
+          <span><span [class.sheet-missing]="!issuer.nit">NIT {{ issuer.nit || 'pendiente' }}</span>{{ issuer.establishment ? ' · ' + issuer.establishment : '' }}{{ issuer.rnt ? ' · RNT ' + issuer.rnt : '' }}</span>
+          <span>{{ join(issuer.address, issuer.city) }}</span>
+          <span>{{ join(issuer.phone, issuer.email) }}</span>
         </div>
       </div>
       <div class="sheet-number">
@@ -39,10 +40,11 @@ import { amountInWords } from '../number-words';
       </div>
     </header>
 
-    <p class="sheet-resolution">
+    <p class="sheet-resolution" *ngIf="resolution.number; else noResolution">
       Autorización de numeración DIAN n.º {{ resolution.number }} · Prefijo {{ resolution.prefix }} ·
-      Rango {{ resolution.from }} a {{ resolution.to }} · Vigencia {{ date(resolution.validFrom) }} – {{ date(resolution.validTo) }}
+      Rango {{ resolution.from }} a {{ resolution.to }}{{ resolution.validFrom && resolution.validTo ? ' · Vigencia ' + date(resolution.validFrom!) + ' – ' + date(resolution.validTo!) : '' }}
     </p>
+    <ng-template #noResolution><p class="sheet-resolution sheet-missing">Resolución de facturación DIAN pendiente de configurar (Facturación › Configuración).</p></ng-template>
 
     <div class="sheet-boxes">
       <section>
@@ -103,9 +105,9 @@ import { amountInWords } from '../number-words';
     <footer class="sheet-foot">
       <span class="sheet-qr">{{ invoice.cufe ? 'QR de consulta DIAN' : 'Código QR al emitir' }}</span>
       <div>
-        <p><strong>CUFE:</strong> <code>{{ invoice.cufe || '[Se genera al validar con la DIAN]' }}</code></p>
+        <p><strong>CUFE:</strong> <code>{{ invoice.cufe || 'Se asigna cuando la DIAN valida la factura' }}</code></p>
         <p>Representación gráfica de la factura electrónica de venta.</p>
-        <p>Proveedor tecnológico: {{ providerName }}</p>
+        <p *ngIf="providerName">Proveedor tecnológico: {{ providerName }}</p>
         <p *ngIf="invoice.annulment" class="sheet-annulled">Anulada con nota crédito {{ invoice.annulment.creditNote }} · {{ invoice.annulment.reason }}</p>
       </div>
     </footer>
@@ -131,6 +133,7 @@ export class InvoiceSheetComponent {
   get resolution() { return this.config.get().resolution; }
   get providerName() { return this.config.get().provider.name; }
   get numberPreview() { return this.invoices.nextNumber(); }
+  join(...parts: string[]): string { return parts.filter(Boolean).join(' · '); }
   get reservation() { return this.reservations.getById(this.invoice.reservationId); }
   get lines() { return this.invoice.lines.filter(l => l.included); }
   get t() { return computeTotals(this.invoice.lines); }

@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../auth.service';
+import { API_ROOT } from '../api';
+import { UsersService } from '../users/users.service';
 
 @Component({
   selector: 'app-login',
@@ -29,7 +31,7 @@ import { AuthService } from '../auth.service';
 
         <!-- Marca -->
         <div class="login-brand">
-          <img src="/assets/logo2.png" alt="Hospedaje Sebastián Filandia" class="brand-logo">
+          <img src="/assets/brand/sogo-fondo-claro.png" alt="SOGO" class="brand-logo">
         </div>
 
         <!-- Títulos -->
@@ -153,7 +155,7 @@ import { AuthService } from '../auth.service';
             ¡Reserva fácil, rápida y segura!
           </p>
           <p class="login-footer-copy">
-            © 2024 Hospedaje Sebastián Filandia.<br>
+            © 2026 Hospedaje Sebastián Filandia.<br>
             Todos los derechos reservados.
           </p>
         </div>
@@ -174,7 +176,7 @@ export class LoginComponent implements OnInit {
   oauthReady = false;
   oauthProviders = { google: false, azure: false };
 
-  constructor(private auth: AuthService, private router: Router) {}
+  constructor(private auth: AuthService, private router: Router, private users: UsersService) {}
 
   ngOnInit(): void {
     const token = localStorage.getItem('sogo_token');
@@ -182,6 +184,16 @@ export class LoginComponent implements OnInit {
       this.router.navigate(['/dashboard']);
       return;
     }
+    const oauthError = new URLSearchParams(window.location.search).get('oauthError');
+    const oauthMotivos: Record<string, string> = {
+      'not-registered': 'Ese correo de Google no tiene una cuenta del personal en SOGO. Pide al administrador que la cree con ese mismo correo.',
+      bloqueada: 'Tu cuenta está bloqueada. Pide al administrador que la desbloquee.',
+      desactivada: 'Tu cuenta está desactivada. Comunícate con el administrador.',
+      'con activación vencida': 'El plazo para activar tu cuenta venció. Pide al administrador que reenvíe la activación.',
+      'sin acceso a SOGO': 'Tu cuenta no tiene un rol de SOGO asignado. Pide al administrador que te asigne uno.',
+    };
+    if (oauthError && oauthMotivos[oauthError]) this.error = oauthMotivos[oauthError];
+    else if (oauthError === 'no-email') this.error = 'El proveedor no compartió tu correo. Inicia sesión con usuario y contraseña.';
     this.auth.getOAuthProviders().subscribe({
       next: (p) => { this.oauthProviders = p; this.oauthReady = true; },
       error: () => { this.oauthReady = true; }
@@ -189,17 +201,20 @@ export class LoginComponent implements OnInit {
   }
 
   loginWithGoogle(): void {
-    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+    window.location.href = `${API_ROOT}/oauth2/authorization/google`;
   }
 
   loginWithMicrosoft(): void {
-    window.location.href = 'http://localhost:8080/oauth2/authorization/azure';
+    window.location.href = `${API_ROOT}/oauth2/authorization/azure`;
   }
 
   submit(): void {
     this.error = '';
     this.auth.login(this.username, this.password).subscribe({
       next: (r: any) => {
+        // El servidor validó la contraseña; la cuenta además debe estar activa en Usuarios y Roles
+        const check = this.users.recordLogin({ username: r.username || this.username, email: r.email || '' });
+        if (!check.ok) { this.error = check.message; return; }
         localStorage.setItem('sogo_token', r.token);
         localStorage.setItem('sogo_role', r.role || '');
         localStorage.setItem('sogo_username', r.username || this.username);
@@ -208,7 +223,16 @@ export class LoginComponent implements OnInit {
         this.router.navigate(['/dashboard']);
       },
       error: (e) => {
-        this.error = e.error?.error || 'Error de autenticación';
+        if (e.status === 401) this.users.recordFailedLogin(this.username.trim());
+        const motivos: Record<string, string> = {
+          bloqueada: 'Tu cuenta está bloqueada por intentos fallidos. Pide al administrador que la desbloquee o restablezca tu contraseña.',
+          desactivada: 'Tu cuenta está desactivada. Comunícate con el administrador.',
+          'con activación vencida': 'El plazo para activar tu cuenta venció. Pide al administrador que reenvíe la activación.',
+          'sin acceso a SOGO': 'Tu cuenta no tiene un rol de SOGO asignado. Pide al administrador que te asigne uno.',
+        };
+        this.error = e.status === 401
+          ? motivos[e.error?.error] ?? 'Usuario o contraseña incorrectos.'
+          : e.status === 0 ? 'No hay conexión con el servidor de SOGO.' : 'Error de autenticación';
       }
     });
   }

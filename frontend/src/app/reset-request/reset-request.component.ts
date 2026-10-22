@@ -29,7 +29,7 @@ import { AuthService } from '../auth.service';
 
         <!-- Marca -->
         <div class="login-brand">
-          <img src="/assets/logo2.png" alt="Hospedaje Sebastián Filandia" class="brand-logo">
+          <img src="/assets/brand/sogo-fondo-claro.png" alt="SOGO" class="brand-logo">
         </div>
 
         <!-- Ícono correo -->
@@ -71,12 +71,12 @@ import { AuthService } from '../auth.service';
           </div>
 
           <!-- Botón enviar -->
-          <button class="primary" type="button" (click)="submit()">
+          <button class="primary" type="button" (click)="submit()" [disabled]="loading">
             <svg viewBox="0 0 24 24">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
-            Enviar enlace de recuperación
+            {{ loading ? 'Enviando…' : 'Enviar enlace de recuperación' }}
           </button>
 
           <!-- Mensaje confirmación / error -->
@@ -122,15 +122,21 @@ export class ResetRequestComponent {
   email   = '';
   message = '';
   error   = '';
+  loading = false;
 
   constructor(private auth: AuthService) {}
 
   submit(): void {
     this.message = '';
     this.error   = '';
+    if (!this.email.trim()) { this.error = 'Escribe el correo de tu cuenta.'; return; }
+    this.loading = true;
     this.auth.resetRequest(this.email).subscribe({
-      next:  (r: any) => { this.message = r.message || 'Si existe una cuenta, se envió el enlace.'; },
-      error: ()       => { this.error   = 'No se pudo enviar el correo. Intenta de nuevo.'; }
+      next:  (r: any) => { this.message = r.message || 'Si existe una cuenta, se envió el enlace.'; this.loading = false; },
+      error: (e: any) => {
+        this.loading = false;
+        this.error = e?.status === 0 ? 'No hay conexión con el servidor de SOGO.' : e?.error?.message || 'No se pudo enviar el correo. Intenta de nuevo.';
+      }
     });
   }
 }

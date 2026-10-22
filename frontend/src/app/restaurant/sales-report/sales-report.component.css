@@ -1,0 +1,33 @@
+.rep-red { stroke: #DC2626 !important; }
+.rep-green { stroke: #15803D !important; }
+.rep-blue { color: #0A3D6D !important; }
+.rep-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.rep-filters .kit-select { flex: 1; min-width: 140px; }
+.rep-filters .rsv-btn { height: 46px; }
+.rep-kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+
+.rep-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+
+.rep-chart { display: grid; grid-template-columns: 56px 1fr; height: 250px; margin-top: 8px; }
+.rep-axis { display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 26px; font-size: 10.5px; color: #6B7280; text-align: right; padding-right: 8px; }
+.rep-bars { display: flex; align-items: flex-end; gap: 14px; border-bottom: 1px solid #CBD5E1; padding: 0 12px; position: relative; margin-bottom: 26px; background: repeating-linear-gradient(to top, transparent 0, transparent calc(25% - 1px), #EEF1F5 calc(25% - 1px), #EEF1F5 25%); }
+.rep-bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-width: 0; }
+.rep-bar strong { font-size: 11px; color: #0A2540; margin-bottom: 4px; white-space: nowrap; }
+.rep-bar i { width: min(100%, 90px); background: #1565C0; border-radius: 4px 4px 0 0; min-height: 2px; }
+.rep-bar span { position: absolute; bottom: -22px; font-size: 10.5px; color: #6B7280; white-space: nowrap; }
+
+.rep-cat { margin-bottom: 12px; }
+.rep-cat div { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 5px; }
+.rep-cat small { font-weight: 400; color: #6B7280; }
+.rep-cat i { display: block; height: 7px; border-radius: 999px; background: #E6EBF2; overflow: hidden; }
+.rep-cat b { display: block; height: 100%; background: #1565C0; border-radius: 999px; }
+
+.rep-detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rep-detail-head .kit-muted { font-size: 11.5px; }
+.rep-sub { display: block; color: #6B7280; font-size: 11px; }
+.rep-products { max-width: 200px; color: #4B5563; font-size: 11.5px; }
+.rep-total td { background: #EEF5FD; font-weight: 700; color: #0A2540; }
+.rep-more { margin-top: 12px; }
+.rep-note { font-size: 11px; margin: 12px 0 0; }
+
+@media (max-width: 1100px) { .rep-grid { grid-template-columns: 1fr; } }

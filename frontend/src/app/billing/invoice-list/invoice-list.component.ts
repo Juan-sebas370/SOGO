@@ -99,6 +99,13 @@ const defaultFilters = () => ({ search: '', from: isoDate(-29), to: isoDate(0), 
     </div>
   </section>
 
+  <!-- Configuración incompleta: no se puede emitir -->
+  <div class="bil-alert bil-alert--warn" *ngIf="blockers.length" role="status">
+    <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <p><strong>Antes de emitir facturas completa la configuración.</strong> {{ blockers.join(' ') }}</p>
+    <a class="bil-alert-btn" *ngIf="can('Configurar integración')" routerLink="/dashboard/billing/settings">Completar</a>
+  </div>
+
   <!-- Factura rechazada por la DIAN -->
   <div class="bil-alert" *ngIf="rejected[0] as bad" role="alert">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -267,6 +274,7 @@ export class InvoiceListComponent {
   }
 
   can(action: Parameters<BillingConfigService['can']>[0]): boolean { return this.config.can(action); }
+  get blockers(): string[] { return this.config.issueBlockers(); }
   total(inv: Invoice): number { return this.svc.total(inv); }
   state(inv: Invoice): InvoiceState { return this.svc.state(inv); }
   canShare(inv: Invoice): boolean { return inv.dianStatus !== 'Borrador' && this.can('Descargar y enviar'); }

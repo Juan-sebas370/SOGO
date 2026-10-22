@@ -305,7 +305,7 @@ const FLOOR_STATUS_ABBR: Record<RoomStatus, string> = {
             <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
           </span>
           <span class="dash-mini-text">
-            <span class="dash-mini-label">Ventas restaurante</span>
+            <span class="dash-mini-label">Ventas restaurante hoy</span>
             <span class="dash-mini-value">{{ formatMoney(restaurantStats.sales) }}</span>
           </span>
         </div>
@@ -329,7 +329,7 @@ const FLOOR_STATUS_ABBR: Record<RoomStatus, string> = {
         <svg viewBox="0 0 24 24"><path d="M2 20v-7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/><path d="M12 15v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v7"/><path d="M2 17h20"/></svg>
         Consultar habitaciones
       </a>
-      <a routerLink="/dashboard/restaurant/orders/new" class="dash-quick-action">
+      <a routerLink="/dashboard/restaurant/room-charge" class="dash-quick-action">
         <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
         Registrar consumo
       </a>
@@ -362,7 +362,7 @@ export class DashboardHomeComponent {
   readonly lodging = lodgingLabel;
 
   invoiceStats: ReturnType<InvoiceService['getStats']> = { total: 0, paid: 0, pending: 0, annulled: 0, rejected: 0, income: 0, pendingAmount: 0 };
-  restaurantStats: ReturnType<RestaurantService['getStats']> = { sales: 0, total: 0, active: 0, products: 0, avgTicket: 0, byCategory: { Alimentos: 0, Bebidas: 0, Postres: 0, Otros: 0 } };
+  restaurantStats: ReturnType<RestaurantService['getStats']> = { sales: 0, ordersToday: 0, openAccounts: 0, outOfStock: 0, lowStock: 0 };
   incomeByDate: { date: string; amount: number }[] = [];
 
   recentReservations: Reservation[] = [];

@@ -11,9 +11,12 @@ import {
 } from '../invoice.model';
 import { InvoiceSheetComponent } from '../invoice-sheet/invoice-sheet.component';
 import { ReservationService } from '../../reservations/reservation.service';
-import { Reservation, lodgingLabel, paidAmount, isInHouse, isVoid } from '../../reservations/reservation.model';
+import { Reservation, lodgingLabel, paidAmount, isInHouse, isVoid, splitFullName } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
+import { UsersService } from '../../users/users.service';
+import { toast } from '../../shared/toast/toast.service';
+import { serverMessage } from '../../shared/toast/notify.interceptor';
 
 type Step = 1 | 2 | 3;
 
@@ -102,7 +105,7 @@ type Step = 1 | 2 | 3;
         <div class="bil-card-head">
           <div>
             <span class="bil-card-icon"><svg viewBox="0 0 24 24"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></span>
-            <div><h2 class="bil-card-title">Alojamiento y consumos</h2><span class="bil-card-sub">CU03 · Tomados de Reservas, Restaurante e Inventarios</span></div>
+            <div><h2 class="bil-card-title">Alojamiento y consumos</h2><span class="bil-card-sub">CU03 · La reserva y los consumos cargados a la estadía</span></div>
           </div>
           <div class="nf-card-actions">
             <button type="button" class="rsv-btn rsv-btn--outline nf-sm" (click)="openDiscount()">Aplicar descuento</button>
@@ -319,11 +322,12 @@ type Step = 1 | 2 | 3;
         </ul>
       </section>
 
-      <button type="button" class="rsv-btn rsv-btn--primary bil-block-btn" [disabled]="!preflightOk || !canIssue" (click)="issue()">
+      <button type="button" class="rsv-btn rsv-btn--primary bil-block-btn" [disabled]="!preflightOk || !canIssue || saving" (click)="issue()">
         <svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-        {{ correcting ? 'Reenviar a la DIAN' : 'Emitir y enviar a la DIAN' }}
+        {{ saving ? 'Guardando…' : correcting ? 'Guardar corrección' : 'Emitir factura' }}
       </button>
-      <p class="bil-hint" *ngIf="!canIssue">Tu rol no tiene permiso para generar facturas.</p>
+      <p class="bil-hint" *ngIf="!canIssue">Tu rol no tiene permiso para {{ correcting ? 'corregir' : 'generar' }} facturas.</p>
+      <p class="nf-err" *ngIf="serverError">{{ serverError }}</p>
       <div class="bil-side-row">
         <button type="button" class="rsv-btn rsv-btn--outline" (click)="goStep(correcting ? 2 : 1)">Volver a editar</button>
         <button type="button" class="rsv-btn rsv-btn--outline" *ngIf="!correcting" (click)="draftPdf()">Borrador PDF</button>
@@ -332,10 +336,10 @@ type Step = 1 | 2 | 3;
       <section class="bil-card" *ngIf="!correcting">
         <h3 class="bil-card-title nf-side-title">Qué pasa al emitir</h3>
         <ol class="nf-steps-info">
-          <li><span>1</span>Se asigna el número <strong>{{ nextNumber }}</strong> con la fecha y hora de emisión.</li>
-          <li><span>2</span>Se envía al proveedor tecnológico, que la valida con la DIAN y devuelve el CUFE.</li>
-          <li><span>3</span>La cuenta del huésped se actualiza y la factura queda asociada al check-out.</li>
-          <li><span>4</span>Se registran fecha, hora y usuario para auditoría. Luego podrás descargarla o enviarla.</li>
+          <li><span>1</span>El servidor asigna el siguiente número de la resolución (aprox. <strong>{{ nextNumber }}</strong>) con la fecha y hora de emisión.</li>
+          <li><span>2</span>La factura queda <strong>pendiente de validación DIAN</strong>: se valida con el proveedor tecnológico{{ providerName ? ' (' + providerName + ')' : '' }}.</li>
+          <li><span>3</span>Cuando la DIAN responda, registra el CUFE (aceptada) o el motivo (rechazada) en el detalle de la factura.</li>
+          <li><span>4</span>Contabilidad causa el ingreso con la factura y los consumos quedan marcados como facturados.</li>
         </ol>
       </section>
     </aside>
@@ -410,11 +414,11 @@ type Step = 1 | 2 | 3;
       </div>
       <div class="rsv-field">
         <label for="c-desc">Descripción *</label>
-        <input id="c-desc" type="text" class="rsv-input" [(ngModel)]="conceptForm.description" placeholder="Restaurante · Cena de bienvenida">
+        <input id="c-desc" type="text" class="rsv-input" [(ngModel)]="conceptForm.description" placeholder="Ej.: Lavandería · 3 prendas">
       </div>
       <div class="rsv-field">
         <label for="c-detail">Detalle</label>
-        <input id="c-detail" type="text" class="rsv-input" [(ngModel)]="conceptForm.detail" placeholder="Comanda R-2291">
+        <input id="c-detail" type="text" class="rsv-input" [(ngModel)]="conceptForm.detail" placeholder="Ej.: Piso 2 · solicitado en recepción">
       </div>
       <div class="nf-grid nf-grid--2">
         <div class="rsv-field">
@@ -441,7 +445,7 @@ export class InvoiceNewComponent {
   readonly docTypes = DOC_TYPES;
   readonly responsibilities = FISCAL_RESPONSIBILITIES;
   readonly departments = Object.keys(LOCATIONS);
-  readonly categories: ConceptCategory[] = ['Restaurante', 'Minibar', 'Lavandería', 'Eventos y pasadías', 'Otro'];
+  readonly categories: ConceptCategory[] = ['Daños y faltantes', 'Lavandería', 'Eventos y pasadías', 'Otro'];
 
   readonly money = fmtMoney;
   readonly date = fmtDate;
@@ -452,7 +456,9 @@ export class InvoiceNewComponent {
   readonly discount = lineDiscount;
   readonly tax = taxLabel;
   readonly max0 = (n: number) => Math.max(0, n);
-  readonly user = localStorage.getItem('sogo_role') || 'Usuario';
+  get user(): string { return this.users.actor(); }
+  saving = false;
+  serverError = '';
 
   step: Step = 1;
   correcting = false;
@@ -473,6 +479,7 @@ export class InvoiceNewComponent {
     private config: BillingConfigService,
     private charges: ChargeService,
     private reservations: ReservationService,
+    private users: UsersService,
     private router: Router,
     route: ActivatedRoute,
   ) {
@@ -619,7 +626,7 @@ export class InvoiceNewComponent {
 
   openConcept(): void {
     this.modalError = '';
-    this.conceptForm = { category: 'Restaurante', description: '', detail: '', date: isoDate(0), quantity: 1, unitValue: 0 };
+    this.conceptForm = { category: 'Daños y faltantes', description: '', detail: '', date: isoDate(0), quantity: 1, unitValue: 0 };
   }
 
   /** El concepto se registra como consumo de la estadía (y suma a sus servicios adicionales). */
@@ -643,9 +650,17 @@ export class InvoiceNewComponent {
     this.conceptForm = undefined;
   }
 
-  saveDraft(): void {
-    this.svc.saveDraft(this.inv);
-    this.router.navigate(['/dashboard/billing']);
+  async saveDraft(): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
+    try {
+      await this.svc.saveDraft(this.inv);
+      this.router.navigate(['/dashboard/billing']);
+    } catch {
+      // El aviso de error lo muestra el interceptor
+    } finally {
+      this.saving = false;
+    }
   }
 
   // ── Paso 2 · datos fiscales ──
@@ -681,50 +696,62 @@ export class InvoiceNewComponent {
 
   // ── Paso 3 · emisión ──
   get nextNumber(): string { return this.correcting ? this.inv.number : this.svc.nextNumber(); }
-  get canIssue(): boolean { return this.config.can('Generar factura'); }
+  get canIssue(): boolean { return this.config.can(this.correcting ? 'Validar datos fiscales' : 'Generar factura'); }
+  get providerName(): string { return this.config.get().provider.name; }
 
   get preflight() {
-    const c = this.config.get();
     const usage = this.svc.rangeUsage();
-    const today = isoDate(0);
-    const resolutionOk = usage.left > 0 && c.resolution.validFrom <= today && c.resolution.validTo >= today;
+    const blockers = this.config.issueBlockers();
     return [
       { ok: !!this.inv.fiscalValidatedAt && !this.failed.length, label: 'Datos fiscales validados', detail: this.inv.fiscalValidatedAt ? `${fmtDateTime(this.inv.fiscalValidatedAt)} · ${this.user}` : 'Pendiente' },
       { ok: this.t.count > 0 && this.t.total > 0, label: 'Totales e impuestos calculados', detail: `${this.t.count} conceptos · ${fmtMoney(this.t.total)}` },
-      { ok: resolutionOk, label: 'Resolución de numeración vigente', detail: resolutionOk ? `Quedan ${usage.left.toLocaleString('es-CO')} números del rango` : 'Rango agotado o resolución vencida' },
-      { ok: c.provider.connected, label: 'Proveedor de facturación conectado', detail: `Última prueba: ${c.provider.lastResponse.split(' · ')[0].replace('T', ' ')}` },
+      { ok: !blockers.length, label: 'Emisor y resolución DIAN', detail: blockers[0] ?? `Resolución vigente · quedan ${usage.left.toLocaleString('es-CO')} números` },
+      { ok: this.correcting || usage.left > 0, label: 'Rango de numeración', detail: usage.left > 0 ? `Próximo número ${this.nextNumber}` : 'Se agotó el rango autorizado' },
     ];
   }
 
   get preflightOk(): boolean { return this.preflight.every(c => c.ok); }
 
-  issue(): void {
-    if (this.updateGuest && this.inv.billTo === 'Huésped' && this.reservation) this.updateGuestRecord();
-    const withEvent: Invoice = {
-      ...this.inv,
-      events: [...this.inv.events, { at: this.inv.fiscalValidatedAt!, label: 'Datos fiscales validados', detail: this.user, tone: 'muted' }],
-    };
-    if (this.correcting) {
-      this.svc.resend(this.inv.id, this.inv.buyer);
-      this.router.navigate(['/dashboard/billing', this.inv.id]);
-      return;
+  async issue(): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
+    this.serverError = '';
+    try {
+      if (this.correcting) {
+        await this.svc.resend(this.inv.id, this.inv.buyer);
+        this.router.navigate(['/dashboard/billing', this.inv.id]);
+        return;
+      }
+      const issued = await this.svc.issue(this.inv);
+      if (this.updateGuest && this.inv.billTo === 'Huésped' && this.reservation) this.updateGuestRecord();
+      toast.success(`Factura ${issued.number} emitida`, 'Registra la respuesta de la DIAN cuando el proveedor la valide');
+      this.router.navigate(['/dashboard/billing', issued.id]);
+    } catch (e) {
+      this.serverError = serverMessage(e) || 'No se pudo emitir la factura.';
+    } finally {
+      this.saving = false;
     }
-    const issued = this.svc.issue(withEvent);
-    this.router.navigate(['/dashboard/billing', issued.id]);
   }
 
   /** Guarda el borrador y abre su representación gráfica para imprimir o guardar como PDF. */
-  draftPdf(): void {
-    const saved = this.svc.saveDraft(this.inv);
-    this.inv.id = saved.id;
-    this.router.navigate(['/facturas', saved.id, 'imprimir'], { queryParams: { pdf: 1 } });
+  async draftPdf(): Promise<void> {
+    try {
+      const saved = await this.svc.saveDraft(this.inv);
+      this.inv.id = saved.id;
+      this.router.navigate(['/facturas', saved.id, 'imprimir'], { queryParams: { pdf: 1 } });
+    } catch {
+      // El aviso de error lo muestra el interceptor
+    }
   }
 
   private updateGuestRecord(): void {
     const b = this.inv.buyer;
     const r = this.reservation!;
+    // Si el nombre cambió en la factura, se actualizan también nombres y apellidos de la reserva
+    const name = b.name.trim().replace(/\s+/g, ' ');
+    const names = name !== r.guestName ? (([firstName, lastName]) => ({ firstName, lastName }))(splitFullName(name)) : {};
     this.reservations.update(r.id, {
-      guestName: b.name, docNumber: b.docNumber, email: b.email, phone: b.phone,
+      guestName: name, ...names, docNumber: b.docNumber, email: b.email, phone: b.phone,
       city: `${b.country} - ${b.city}, ${b.department}`,
     });
   }

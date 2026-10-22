@@ -1,124 +1,271 @@
+import { toast } from '../shared/toast/toast.service';
+import { serverMessage } from '../shared/toast/notify.interceptor';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Product, StockStatus, StockMovement, InventoryEntry, ProductCategory } from './inventory.model';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
+import { Product, Category, Supplier, Movement, MovementKind, MovementLine, Alert, AlertConfig, movementValue } from './inventory.model';
+import { UsersService } from '../users/users.service';
+import { isoDate, isoDateTime } from '../shared/date-utils';
+import { API_URL } from '../api';
 
-const calcStatus = (p: Partial<Product>): StockStatus => {
-  if (p.expiryDate && new Date(p.expiryDate) < new Date()) return 'Vencido';
-  if ((p.stockActual ?? 0) <= 0) return 'Crítico';
-  if ((p.stockActual ?? 0) < (p.stockMin ?? 0)) return 'Bajo';
-  if ((p.stockActual ?? 0) <= (p.stockMin ?? 0) * 1.2) return 'Bajo';
-  return 'Óptimo';
-};
+const money = (v: number) => '$ ' + new Intl.NumberFormat('es-CO').format(Math.round(v));
+const API = `${API_URL}/inventario`;
 
+export type NewProduct = Omit<Product, 'id' | 'stock' | 'createdAt' | 'history' | 'counted' | 'categoryInUse'>;
+export interface EntryInput { reason: string; date: string; supplierId: number | null; invoice: string; receivedBy: string; observations: string; lines: { productId: string; qty: number; unitCost: number }[]; }
+export interface ExitInput { reason: string; date: string; area: string; deliveredTo: string; reference: string; observations: string; lines: { productId: string; qty: number }[]; }
+export interface AdjustInput { reason: string; date: string; location: string; observations: string; lines: { productId: string; counted: number; reason: string; note: string }[]; }
+export interface ExportLog { file: string; period: string; user: string; at: string; }
+
+/** Mensaje del servidor (validaciones) o uno genérico. */
+export const serverError = (e: any, what: string) => e?.error?.message || `No se pudo ${what}. Intenta de nuevo.`;
+
+/**
+ * Inventarios desde la base de datos (API /api/inventario). Las pantallas leen la copia en
+ * memoria; cada cambio lo valida y calcula el servidor (existencias, costo promedio, número del
+ * movimiento y alertas) y luego se recargan los datos.
+ */
 @Injectable({ providedIn: 'root' })
 export class InventoryService {
 
-  private products: Product[] = [
-    { id:'1',  code:'PROD-0001', name:'Arroz Premium 25 kg',       category:'Alimentos', unit:'Bulto',   stockActual:129, stockMin:30,  stockMax:200, unitCost:85000,  salePrice:95000,  location:'Almacén Principal - Estante 1', brand:'La Favorita',   supplier:'Molinos del Valle S.A.S.',  description:'Arroz de grano largo premium.', expiryDate:'2025-06-01', isPerishable:false, status:'Óptimo' },
-    { id:'2',  code:'PROD-0002', name:'Leche Entera 1 L',          category:'Alimentos', unit:'Unidad',  stockActual:80,  stockMin:50,  stockMax:300, unitCost:3200,   salePrice:3800,   location:'Almacén Principal - Estante 2', brand:'Alquería',      supplier:'Alquería S.A.',            description:'Leche entera pasteurizada 1 litro.', expiryDate:'2024-06-10', isPerishable:true, status:'Óptimo' },
-    { id:'3',  code:'PROD-0003', name:'Café Molido 500 g',         category:'Bebidas',   unit:'Bolsa',   stockActual:45,  stockMin:20,  stockMax:150, unitCost:12500,  salePrice:15000,  location:'Almacén Principal - Estante 3', brand:'Juan Valdez',   supplier:'Café de Colombia Ltda.',   description:'Café molido 100% colombiano.', expiryDate:'2025-03-01', isPerishable:false, status:'Óptimo' },
-    { id:'4',  code:'PROD-0004', name:'Azúcar Blanca 1 kg',        category:'Alimentos', unit:'Paquete', stockActual:60,  stockMin:40,  stockMax:250, unitCost:3500,   salePrice:4200,   location:'Almacén Principal - Estante 1', brand:'Manuelita',     supplier:'Manuelita S.A.',           description:'Azúcar blanca refinada.',     expiryDate:'2025-12-01', isPerishable:false, status:'Óptimo' },
-    { id:'5',  code:'PROD-0005', name:'Detergente Líquido 1 L',    category:'Limpieza',  unit:'Unidad',  stockActual:25,  stockMin:30,  stockMax:100, unitCost:8500,   salePrice:11000,  location:'Bodega Limpieza - Estante 1',   brand:'Ariel',         supplier:'P&G Colombia',             description:'Detergente líquido multiusos.', expiryDate:'2026-01-01', isPerishable:false, status:'Bajo' },
-    { id:'6',  code:'PROD-0006', name:'Aceite Vegetal 1 L',        category:'Alimentos', unit:'Unidad',  stockActual:5,   stockMin:20,  stockMax:100, unitCost:9800,   salePrice:12000,  location:'Almacén Principal - Estante 2', brand:'Gourmet',       supplier:'Aceites del Valle',        description:'Aceite vegetal para cocinar.',expiryDate:'2025-08-01', isPerishable:false, status:'Crítico' },
-    { id:'7',  code:'PROD-0007', name:'Aceite Yogurt 5 L',         category:'Alimentos', unit:'Unidad',  stockActual:8,   stockMin:10,  stockMax:80,  unitCost:32000,  salePrice:38000,  location:'Almacén Principal - Estante 2', brand:'Alpina',        supplier:'Alpina S.A.',              description:'Yogurt natural familiar.',   expiryDate:'2024-05-30', isPerishable:true, status:'Vencido' },
-    { id:'8',  code:'PROD-0008', name:'Jabón de Manos 500 ml',     category:'Aseo',      unit:'Unidad',  stockActual:18,  stockMin:15,  stockMax:80,  unitCost:7500,   salePrice:9500,   location:'Bodega Aseo - Estante 1',       brand:'Protex',        supplier:'Colgate-Palmolive',        description:'Jabón antibacterial.',       expiryDate:'2026-03-01', isPerishable:false, status:'Óptimo' },
-    { id:'9',  code:'PROD-0009', name:'Harina de Trigo 1 kg',      category:'Alimentos', unit:'Paquete', stockActual:5,   stockMin:15,  stockMax:100, unitCost:3850,   salePrice:4500,   location:'Almacén Principal - Estante 3', brand:'Doña Blanca',   supplier:'Molinos del Valle S.A.S.', description:'Harina de trigo fortificada.', expiryDate:'2025-02-01', isPerishable:false, status:'Crítico' },
-    { id:'10', code:'PROD-0010', name:'Café Molido 500 g',         category:'Bebidas',   unit:'Bolsa',   stockActual:16,  stockMin:15,  stockMax:80,  unitCost:14000,  salePrice:18000,  location:'Almacén Principal - Estante 3', brand:'Colcafé',       supplier:'Café de Colombia Ltda.',   description:'Café tostado molido.',       expiryDate:'2025-04-01', isPerishable:false, status:'Óptimo' },
-  ];
+  private products: Product[] = [];
+  private movements: Movement[] = [];
+  private alerts: Alert[] = [];
+  private categories: Category[] = [];
+  private supplierRows: Supplier[] = [];
+  private nextNumbers: Partial<Record<MovementKind, string>> = {};
+  private products$ = new BehaviorSubject<Product[]>([]);
+  private movements$ = new BehaviorSubject<Movement[]>([]);
+  private alerts$ = new BehaviorSubject<Alert[]>([]);
+  private loading?: Promise<void>;
+  private loadedFor = '';
 
-  private movements: StockMovement[] = [
-    { id:'1', date:'2024-05-24', type:'Entrada', product:'Arroz Premium 25 kg',    quantity:50, user:'María López', reference:'FV-0001288' },
-    { id:'2', date:'2024-05-24', type:'Salida',  product:'Leche Entera 1 L',       quantity:30, user:'Juan Pérez',  reference:'Consumo interno' },
-    { id:'3', date:'2024-05-23', type:'Entrada', product:'Detergente Líquido 1 L', quantity:45, user:'Ana Gómez',   reference:'FV-0001255' },
-    { id:'4', date:'2024-05-23', type:'Salida',  product:'Café Molido 500 g',      quantity:12, user:'Juan Pérez',  reference:'Restaurante' },
-    { id:'5', date:'2024-05-22', type:'Ajuste',  product:'Café Molido 500 g',      quantity:5,  user:'Carlos Ruiz', reference:'Ajuste conteo' },
-  ];
+  config: AlertConfig = { expiryDays: 7, lowStock: true, unusualPct: 50, maxShrinkPct: 2 };
+  /** Conteos físicos guardados como borrador en esta sesión, por ubicación. */
+  countDrafts: Record<string, { counted: Record<string, number>; reasons: Record<string, string>; notes: Record<string, string>; at: string }> = {};
+  lastUpdate = isoDateTime();
 
-  private products$ = new BehaviorSubject<Product[]>(this.products);
+  constructor(private audit: UsersService, private http: HttpClient) {}
 
-  getAll():    Observable<Product[]> { return this.products$.asObservable(); }
-  getById(id: string): Product | undefined { return this.products.find(p => p.id === id); }
+  /** Primera carga de la sesión (el dashboard la espera antes de abrir los módulos). */
+  ready(): Promise<void> {
+    const token = localStorage.getItem('sogo_token') || '';
+    if (!this.loading || token !== this.loadedFor) {
+      this.loadedFor = token;
+      this.loading = this.load();
+    }
+    return this.loading;
+  }
 
-  getMovements(): StockMovement[] { return this.movements; }
+  reload(): Promise<void> { return this.loading = this.load(); }
 
-  create(p: Omit<Product,'id'|'code'|'status'>): Product {
-    const n = this.products.length + 1;
-    const newP: Product = {
-      ...p,
-      id: String(Date.now()),
-      code: `PROD-${String(n).padStart(4,'0')}`,
-      status: calcStatus(p)
+  private async load(): Promise<void> {
+    if (!localStorage.getItem('sogo_token')) return;
+    const get = <T>(path: string) => firstValueFrom(this.http.get<T>(`${API}/${path}`));
+    try {
+      const [products, movements, alerts, categories, suppliers, next, cfg] = await Promise.all([
+        get<Product[]>('productos'), get<Movement[]>('movimientos'), get<Alert[]>('alertas'), get<Category[]>('categorias'),
+        get<Supplier[]>('proveedores'), get<Partial<Record<MovementKind, string>>>('movimientos/proximos'),
+        firstValueFrom(this.http.get<AlertConfig | null>(`${API_URL}/configuracion/inventario_alertas`)),
+      ]);
+      this.products = products;
+      this.movements = movements;
+      this.alerts = alerts;
+      this.categories = categories;
+      this.supplierRows = suppliers;
+      this.nextNumbers = next;
+      if (cfg) this.config = { ...this.config, ...cfg };
+      this.lastUpdate = isoDateTime();
+      this.emit();
+    } catch (e: any) {
+      console.error('No se pudo cargar el inventario', e);
+      if (e?.status !== 401) toast.error('No se pudo cargar el inventario', serverMessage(e));
+    }
+  }
+
+  // ── Lectura ──────────────────────────────────────────
+
+  getProducts(): Observable<Product[]> { return this.products$.asObservable(); }
+  productsSnapshot(): Product[] { return this.products; }
+  /** Productos que se pueden mover (categorías en uso). */
+  activeProducts(): Product[] { return this.products.filter(p => p.categoryInUse); }
+  getProduct(id: string): Product | undefined { return this.products.find(p => p.id === id); }
+  findByCode(code: string, exceptId?: string): Product | undefined {
+    const c = code.trim().toUpperCase();
+    return this.products.find(p => p.id !== exceptId && p.code === c);
+  }
+  findByName(name: string, exceptId?: string): Product | undefined {
+    const n = name.trim().toLowerCase();
+    return n ? this.products.find(p => p.id !== exceptId && p.name.toLowerCase() === n) : undefined;
+  }
+
+  getMovements(): Observable<Movement[]> { return this.movements$.asObservable(); }
+  movementsSnapshot(): Movement[] { return this.movements; }
+  movementsFor(productId: string): { m: Movement; line: MovementLine }[] {
+    return this.movements.flatMap(m => m.lines.filter(l => l.productId === productId).map(line => ({ m, line })))
+      .sort((a, b) => `${b.m.date}${b.m.time}`.localeCompare(`${a.m.date}${a.m.time}`));
+  }
+
+  getAlerts(): Observable<Alert[]> { return this.alerts$.asObservable(); }
+  alertsSnapshot(): Alert[] { return this.alerts; }
+
+  getCategories(): Category[] { return this.categories; }
+  /** Nombres de los proveedores registrados (para filtros). */
+  suppliers(): string[] { return this.supplierRows.map(s => s.name); }
+  supplierList(): Supplier[] { return this.supplierRows; }
+  /** Ubicaciones que ya se usan en los productos (para sugerir al escribir). */
+  locations(): string[] { return [...new Set(this.products.map(p => p.location).filter(Boolean))].sort(); }
+
+  get canCreate(): boolean { return this.audit.can('Inventarios', 'create'); }
+  get canEdit(): boolean { return this.audit.can('Inventarios', 'edit'); }
+  /** Persona de la sesión (como en el resto de los módulos). */
+  get actorName(): string { return this.audit.actorName(); }
+
+  /** Historial de exportaciones (sale de la auditoría). */
+  get exportsLog(): ExportLog[] {
+    return this.audit.eventsSnapshot().filter(e => e.module === 'Inventarios' && /^exportaci/i.test(e.action))
+      .map(e => { const [file, period] = e.detail.split(' · '); return { file, period: period ?? '', user: e.user, at: e.at }; })
+      .sort((a, b) => b.at.localeCompare(a.at));
+  }
+
+  /** Resumen de alertas activas para la campana de notificaciones. */
+  getAlertSummary() {
+    const active = this.alerts.filter(a => a.status === 'Activa');
+    return {
+      critical: active.filter(a => a.type === 'Agotado').length,
+      low: active.filter(a => a.type === 'Stock bajo').length,
+      expiring: active.filter(a => a.type === 'Por vencer').length,
     };
-    this.products = [newP, ...this.products];
+  }
+
+  // ── Categorías y proveedores ─────────────────────────
+
+  async addCategory(name: string): Promise<Category> {
+    const cat = await firstValueFrom(this.http.post<Category>(`${API}/categorias`, { name: name.trim() }));
+    this.categories = [...this.categories, cat];
+    this.audit.addLog('Inventarios: categoría creada', `${cat.name} (${cat.prefix})`);
+    return cat;
+  }
+
+  /** Pone una categoría en pausa (no se usa por ahora) o la vuelve a usar. */
+  async setCategoryInUse(c: Category, inUse: boolean): Promise<void> {
+    await firstValueFrom(this.http.put(`${API}/categorias/${c.id}`, { inUse }));
+    this.audit.addLog('Inventarios: categoría ' + (inUse ? 'en uso' : 'en pausa'), c.name);
+    await this.reload();
+  }
+
+  async addSupplier(data: { name: string; docType: string; docNumber: string; phone: string }): Promise<Supplier> {
+    const s = await firstValueFrom(this.http.post<Supplier>(`${API}/proveedores`, data));
+    this.supplierRows = [...this.supplierRows.filter(x => x.id !== s.id), s].sort((a, b) => a.name.localeCompare(b.name));
+    this.audit.addLog('Inventarios: proveedor registrado', `${s.name} · ${s.docType} ${s.docNumber}`);
+    return s;
+  }
+
+  // ── Productos ────────────────────────────────────────
+
+  /** Código sugerido para la categoría (el servidor rechaza duplicados). */
+  nextCode(category: string): string {
+    const prefix = this.categories.find(c => c.name === category)?.prefix ?? 'GEN';
+    const used = this.products.filter(p => p.code.startsWith(prefix + '-')).map(p => Number(p.code.split('-')[1]));
+    return `${prefix}-${String(Math.max(0, ...used) + 1).padStart(3, '0')}`;
+  }
+
+  previewNumber(kind: MovementKind, date = isoDate(0)): string {
+    return this.nextNumbers[kind] ?? `${{ Inicial: 'INI', Entrada: 'ENT', Salida: 'SAL', Ajuste: 'AJU' }[kind]}-${date.slice(0, 4)}-0001`;
+  }
+
+  /** Crea el producto; la cantidad inicial queda como su primer movimiento (INI). */
+  async createProduct(data: NewProduct, initialQty: number): Promise<{ product: Product; movement?: Movement }> {
+    const r = await firstValueFrom(this.http.post<{ product: Product; movement?: Movement }>(`${API}/productos`, { product: data, initialQty }));
+    await this.reload();
+    this.audit.addLog('Inventarios: producto registrado', `${r.product.code} · ${r.product.name} · ${initialQty} ${r.product.unit}`);
+    return { product: this.getProduct(r.product.id) ?? r.product, movement: r.movement };
+  }
+
+  /** Actualiza datos del producto (no las existencias) y guarda el resumen en su historial. */
+  async updateProduct(id: string, changes: Partial<NewProduct>, summary: string[]): Promise<void> {
+    const prev = this.getProduct(id);
+    if (!prev || !summary.length) return;
+    await firstValueFrom(this.http.put(`${API}/productos/${id}`, { product: { ...prev, ...changes }, summary }));
+    await this.reload();
+    this.audit.addLog('Inventarios: producto actualizado', `${prev.code} · ${summary.join(' · ')}`);
+  }
+
+  // ── Movimientos ──────────────────────────────────────
+
+  async registerEntry(e: EntryInput): Promise<{ movement: Movement; attended: number }> {
+    const before = this.activeAlertCount();
+    const movement = await this.post({ kind: 'Entrada', ...e });
+    const attended = Math.max(0, before - this.activeAlertCount());
+    this.audit.addLog('Inventarios: entrada registrada', `${movement.number} · ${e.reason} · ${movement.lines.length} productos · ${money(movementValue(movement))}`);
+    return { movement, attended };
+  }
+
+  async registerExit(e: ExitInput): Promise<Movement> {
+    const movement = await this.post({ kind: 'Salida', ...e });
+    this.audit.addLog('Inventarios: salida registrada', `${movement.number} · ${e.reason} · ${e.area} · ${money(-movementValue(movement))}`);
+    return movement;
+  }
+
+  /** Conteo físico o ajuste: solo las líneas con diferencia generan movimiento (lo decide el servidor). */
+  async registerAdjustment(e: AdjustInput): Promise<Movement> {
+    const movement = await this.post({ kind: 'Ajuste', ...e });
+    this.audit.addLog('Inventarios: ajuste de existencias', `${movement.number} · ${movement.lines.length} productos · ${money(movementValue(movement))}`);
+    return movement;
+  }
+
+  private async post(body: object): Promise<Movement> {
+    const movement = await firstValueFrom(this.http.post<Movement>(`${API}/movimientos`, body));
+    await this.reload();
+    return movement;
+  }
+
+  // ── Alertas ──────────────────────────────────────────
+
+  private activeAlertCount(): number { return this.alerts.filter(a => a.status === 'Activa').length; }
+
+  async markAttended(key: string): Promise<void> {
+    const a = [...this.alerts].reverse().find(x => x.key === key && x.status === 'Activa');
+    if (!a) return;
+    await firstValueFrom(this.http.post(`${API}/alertas/${a.id}/atender`, {}));
+    await this.reload();
+    this.audit.addLog('Inventarios: alerta atendida', `${a.type} · ${this.getProduct(a.productId)?.code}`);
+  }
+
+  async requestPurchase(productId: string): Promise<void> {
+    const p = this.getProduct(productId);
+    if (!p) return;
+    await firstValueFrom(this.http.post(`${API}/productos/${productId}/solicitar-compra`, {}));
+    await this.reload();
+    this.audit.addLog('Inventarios: solicitud de compra', `${p.code} · ${p.name} · ${p.stock}/${p.minStock} ${p.unit}${p.supplier ? ' · ' + p.supplier : ''}`);
+  }
+
+  /** Salidas del día frente al promedio diario de los 30 días anteriores (umbral de consumo inusual). */
+  consumptionCheck(date = isoDate(0)): { today: number; average: number; unusual: boolean } {
+    const value = (d: string) => this.movements.filter(m => m.kind === 'Salida' && m.date === d).reduce((s, m) => s - movementValue(m), 0);
+    let sum = 0;
+    for (let i = 1; i <= 30; i++) { const d = new Date(`${date}T12:00`); d.setDate(d.getDate() - i); sum += value(d.toISOString().slice(0, 10)); }
+    const average = sum / 30, today = value(date);
+    return { today, average, unusual: average > 0 && today > average * (1 + this.config.unusualPct / 100) };
+  }
+
+  /** Umbrales de alerta (Configuración › Metas e indicadores): se guardan y se recalculan las alertas. */
+  async setConfig(c: Partial<AlertConfig>): Promise<void> {
+    const next = { ...this.config, ...c };
+    await firstValueFrom(this.http.put(`${API_URL}/configuracion/inventario_alertas`, next));
+    await firstValueFrom(this.http.post(`${API}/alertas/recalcular`, {}));
+    this.config = next;
+    await this.reload();
+    this.audit.addLog('Inventarios: configuración de alertas', `Por vencer: ${next.expiryDays} días · stock bajo ${next.lowStock ? 'sí' : 'no'} · consumo inusual ${next.unusualPct} % · merma máx. ${next.maxShrinkPct} %`);
+  }
+
+  logExport(file: string, period: string): void {
+    this.audit.addLog('Inventarios: exportación', `${file} · ${period}`);
+  }
+
+  private emit(): void {
     this.products$.next(this.products);
-    return newP;
-  }
-
-  update(id: string, changes: Partial<Product>): void {
-    this.products = this.products.map(p => {
-      if (p.id !== id) return p;
-      const updated = { ...p, ...changes };
-      updated.status = calcStatus(updated);
-      return updated;
-    });
-    this.products$.next(this.products);
-  }
-
-  addEntry(entry: Omit<InventoryEntry,'id'|'number'|'totalItems'|'totalQty'|'totalValue'>): InventoryEntry {
-    // Actualizar stocks
-    entry.items.forEach(item => {
-      const prod = this.products.find(p => p.id === item.productId);
-      if (prod) this.update(prod.id, { stockActual: prod.stockActual + item.quantity, unitCost: item.unitCost });
-    });
-    const totalQty   = entry.items.reduce((a,i) => a + i.quantity, 0);
-    const totalValue = entry.items.reduce((a,i) => a + i.total, 0);
-    const newEntry: InventoryEntry = {
-      ...entry, id: String(Date.now()),
-      number: `FV-${String(Date.now()).slice(-7)}`,
-      totalItems: entry.items.length, totalQty, totalValue
-    };
-    // Registrar movimientos
-    entry.items.forEach(item => {
-      this.movements.unshift({ id: String(Date.now()), date: entry.date, type:'Entrada', product: item.product, quantity: item.quantity, user: 'Administrador', reference: entry.invoice });
-    });
-    return newEntry;
-  }
-
-  getAlerts() {
-    const low      = this.products.filter(p => p.status === 'Bajo').length;
-    const critical = this.products.filter(p => p.status === 'Crítico').length;
-    const expiring = this.products.filter(p => {
-      if (!p.expiryDate) return false;
-      const days = (new Date(p.expiryDate).getTime() - Date.now()) / 86400000;
-      return days > 0 && days <= 30;
-    }).length;
-    return { low, critical, expiring };
-  }
-
-  getValuationReport() {
-    const byCategory: Record<string, { products:number; units:number; costValue:number; saleValue:number }> = {};
-    this.products.forEach(p => {
-      if (!byCategory[p.category]) byCategory[p.category] = { products:0, units:0, costValue:0, saleValue:0 };
-      byCategory[p.category].products++;
-      byCategory[p.category].units      += p.stockActual;
-      byCategory[p.category].costValue  += p.stockActual * p.unitCost;
-      byCategory[p.category].saleValue  += p.stockActual * p.salePrice;
-    });
-    const totals = Object.values(byCategory).reduce((a,c) => ({
-      products: a.products + c.products,
-      units:    a.units    + c.units,
-      costValue:a.costValue+ c.costValue,
-      saleValue:a.saleValue+ c.saleValue,
-    }), { products:0, units:0, costValue:0, saleValue:0 });
-    return { byCategory, totals };
-  }
-
-  getStats() {
-    const total      = this.products.length;
-    const totalValue = this.products.reduce((a,p) => a + p.stockActual * p.unitCost, 0);
-    const totalUnits = this.products.reduce((a,p) => a + p.stockActual, 0);
-    const lowStock   = this.products.filter(p => p.status === 'Bajo' || p.status === 'Crítico').length;
-    const expiring   = this.products.filter(p => p.status === 'Vencido').length;
-    return { total, totalValue, totalUnits, lowStock, expiring };
+    this.movements$.next(this.movements);
+    this.alerts$.next(this.alerts);
   }
 }

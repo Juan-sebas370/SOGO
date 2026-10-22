@@ -7,6 +7,7 @@ import { Reservation, awaitsCheckIn, isInHouse, lodgingLabel, balance } from '..
 import { fmtDate, fmtMoney } from '../../reservations/reservation-format';
 import { RoomService } from '../room.service';
 import { TraService } from '../../tra/tra.service';
+import { SettingsService } from '../../settings/settings.service';
 import { statusLabel as traLabel } from '../../tra/tra-rules';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
 
@@ -120,6 +121,7 @@ export class CheckinFormComponent {
     private svc: ReservationService,
     private roomSvc: RoomService,
     private traSvc: TraService,
+    private settings: SettingsService,
     private router: Router,
     route: ActivatedRoute
   ) {
@@ -150,6 +152,8 @@ export class CheckinFormComponent {
     if (!this.form.date || !this.form.time) return 'Indica la fecha y la hora del check-in.';
     if (!this.form.docNumber.trim()) return 'Confirma el documento del huésped principal.';
     if ((+this.form.adults || 0) < 1) return 'Debe haber al menos un adulto.';
+    // Configuración › Alojamiento: «Exigir TRA en el check-in»
+    if (this.settings.policies.requireTra && (this.tra === 'BORRADOR' || this.tra === 'REQUIERE_CORRECCION')) return 'La política del hospedaje exige la TRA lista antes del check-in: complétala primero.';
 
     const rooms = this.roomSvc.getSnapshot().filter(room => r.rooms.includes(room.number));
     const blocked = rooms.filter(room => room.status === 'En mantenimiento' || room.status === 'Fuera de servicio');

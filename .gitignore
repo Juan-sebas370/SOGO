@@ -1,1 +1,9 @@
 backend/target/
+
+# Claves locales (Google, correo): nunca se suben al repositorio
+backend/*.local.properties
+!backend/*.local.ejemplo.properties
+backend/arranque.log
+
+# Respaldos de la base de datos (contienen datos personales)
+backend/respaldos/

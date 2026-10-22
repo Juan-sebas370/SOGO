@@ -41,6 +41,11 @@
   color: #fff;
 }
 
+/* El logo del hospedaje es blanco: va sobre el recuadro azul */
+.sheet-logo { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet-logo img { width: 44px; height: 44px; object-fit: contain; }
+.sheet-missing { color: #B45309; font-weight: 600; }
+
 .sheet-issuer div, .sheet-number { display: flex; flex-direction: column; gap: 2px; color: #4B5563; }
 .sheet-issuer strong { font-size: 16px; color: #0A2540; }
 .sheet-number { text-align: right; }

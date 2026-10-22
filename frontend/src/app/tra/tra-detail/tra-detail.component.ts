@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Reservation } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney, typeBadge } from '../../reservations/reservation-format';
@@ -15,7 +16,7 @@ import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
 @Component({
   selector: 'app-tra-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, TraStepperComponent],
+  imports: [CommonModule, FormsModule, RouterLink, TraStepperComponent],
   styleUrls: ['./tra-detail.component.css'],
   template: `
   <ng-container *ngIf="rec && r; else notFound">
@@ -28,13 +29,25 @@ import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
     <div class="rsv-header-actions">
       <a *ngIf="editable" class="rsv-btn rsv-btn--outline" [routerLink]="['/dashboard/tra', r.id, 'registro']">Registro de huéspedes</a>
       <a *ngIf="editable" class="rsv-btn rsv-btn--primary" [routerLink]="['/dashboard/tra', r.id, 'resumen']">Ir al resumen</a>
-      <button *ngIf="status === 'ERROR'" type="button" class="rsv-btn rsv-btn--danger" (click)="retry()">Reenviar</button>
+      <button *ngIf="status === 'ERROR' && svc.getSettings().integrationActive" type="button" class="rsv-btn rsv-btn--danger" (click)="retry()">Reenviar</button>
+      <button *ngIf="canReportManually" type="button" class="rsv-btn rsv-btn--primary" (click)="manual = { id: '' }">Registrar reporte del MinCIT</button>
       <button type="button" class="rsv-btn rsv-btn--outline" [disabled]="!rec.sends.length" (click)="downloadReceipt()">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Descargar comprobante
       </button>
     </div>
   </header>
+
+  <!-- Reporte hecho en la plataforma del MinCIT (mientras SOGO no envía automáticamente) -->
+  <section class="tra-card td-manual" *ngIf="manual">
+    <h2>Registrar reporte hecho en la plataforma del MinCIT</h2>
+    <p>Reporta la TRA en la plataforma del Ministerio de Comercio, Industria y Turismo con los datos de esta reserva y escribe aquí el número que te asignó. La TRA quedará <strong>Reportada</strong> y ya no se podrá modificar.</p>
+    <div class="td-manual-row">
+      <input class="rsv-input" [(ngModel)]="manual.id" maxlength="40" placeholder="Número o ID de la TRA en el MinCIT" aria-label="Número de la TRA en el MinCIT">
+      <button type="button" class="rsv-btn rsv-btn--outline" (click)="manual = undefined">Cancelar</button>
+      <button type="button" class="rsv-btn rsv-btn--primary" [disabled]="manual.id.trim().length < 3" (click)="reportManually()">Guardar</button>
+    </div>
+  </section>
 
   <!-- Estado del envío -->
   <section class="tra-card td-status" [ngClass]="'td-status--' + tone">
@@ -168,7 +181,7 @@ export class TraDetailComponent {
   tab: 'request' | 'response' = 'request';
   private units: LodgingUnit[] = [];
 
-  constructor(private svc: TraService, route: ActivatedRoute) {
+  constructor(public svc: TraService, route: ActivatedRoute) {
     const id = route.snapshot.paramMap.get('id')!;
     this.svc.getRows().subscribe(() => {
       const row = this.svc.row(id);
@@ -216,6 +229,19 @@ export class TraDetailComponent {
 
   retry(): void { this.svc.retry(this.r!.id); }
 
+  manual?: { id: string };
+
+  /** Lista para enviar o con error, y aún sin envío automático al MinCIT. */
+  get canReportManually(): boolean {
+    return !this.manual && (this.status === 'LISTA_PARA_ENVIO' || this.status === 'ERROR') && !this.svc.getSettings().integrationActive;
+  }
+
+  reportManually(): void {
+    if (!this.manual || this.manual.id.trim().length < 3) return;
+    this.svc.reportManually(this.r!.id, this.manual.id);
+    this.manual = undefined;
+  }
+
   /** Comprobante imprimible del reporte (Guardar como PDF desde el navegador). */
   downloadReceipt(): void {
     const r = this.r!, rec = this.rec!;
@@ -224,7 +250,7 @@ export class TraDetailComponent {
       <td>${esc(s.status)}</td><td>${esc(s.httpStatus ?? '')}</td><td>${esc(fmtStamp(s.attemptAt, true))}</td></tr>`).join('');
     openDocument(`TRA ${r.code}`, `
       <header><div><h1>Comprobante de reporte TRA</h1><div class="muted">Reserva ${esc(r.code)} · generado el ${esc(fmtDateTime(isoDateTime()))}</div></div>
-      <div class="brand">SOGO<div class="muted" style="font-size:11px;font-weight:400">${esc(this.svc.getSettings().provider)} · RNT ${esc(this.svc.getSettings().rnt)}</div></div></header>
+      <div class="brand">TRA<div class="muted" style="font-size:11px;font-weight:400">RNT ${esc(this.svc.getSettings().rnt)}</div></div></header>
       <h2>Reporte</h2><table>
         <tr><th style="width:38%">Estado</th><td>${esc(statusLabel(this.status))}</td></tr>
         <tr><th>ID MinCIT</th><td>${esc(rec.sends[0]?.mincitId ?? '—')}</td></tr>

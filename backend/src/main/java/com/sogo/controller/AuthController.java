@@ -18,15 +18,17 @@ public class AuthController {
     private final UserService userService;
     private final com.sogo.security.JwtUtil jwtUtil;
     private final ObjectProvider<ClientRegistrationRepository> clientRegistrations;
+    private final com.sogo.service.CorreoService correo;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
     public AuthController(UserService userService, com.sogo.security.JwtUtil jwtUtil,
-                           ObjectProvider<ClientRegistrationRepository> clientRegistrations) {
+                           ObjectProvider<ClientRegistrationRepository> clientRegistrations, com.sogo.service.CorreoService correo) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.clientRegistrations = clientRegistrations;
+        this.correo = correo;
     }
 
     // Lets the frontend know which social providers actually have credentials configured,
@@ -41,47 +43,56 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> payload, jakarta.servlet.http.HttpServletRequest request) {
         String username = payload.get("username");
         String password = payload.get("password");
         if (username == null || password == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "username and password required"));
         }
-        boolean ok = userService.checkCredentials(username, password);
-        if (!ok) return ResponseEntity.status(401).body(Map.of("error", "invalid credentials"));
-        User user = userService.findByUsername(username).orElseThrow();
-        // Generate JWT
-        String jwt = jwtUtil.generateToken(username, user.getRole());
+        var ingreso = userService.authenticate(username, password, request.getRemoteAddr());
+        // motivo: credenciales | bloqueada | desactivada | con activación vencida | sin acceso a SOGO
+        if (!ingreso.ok()) return ResponseEntity.status(401).body(Map.of("error", ingreso.motivo()));
+        User user = ingreso.user();
+        String jwt = jwtUtil.generateToken(user.getUsername(), user.getRole());
         Map<String, Object> resp = new HashMap<>();
         resp.put("token", jwt);
-        resp.put("username", username);
+        resp.put("username", user.getUsername());
         resp.put("role", user.getRole());
         resp.put("fullName", user.getFullName());
         resp.put("email", user.getEmail());
         return ResponseEntity.ok(resp);
     }
 
+    // El JWT no se guarda en el servidor: cerrar sesión es borrarlo en el navegador
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestHeader(name = "Authorization", required = false) String auth) {
-        if (auth != null && auth.startsWith("Bearer ")) {
-            String token = auth.substring(7);
-            userService.invalidateToken(token);
-        }
+    public ResponseEntity<?> logout() {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Envía por correo el enlace para restablecer la contraseña. La respuesta es la misma exista
+     * o no la cuenta (así nadie puede averiguar qué correos están registrados). El enlace nunca
+     * va en la respuesta: cualquiera podría restablecer cuentas ajenas.
+     */
     @PostMapping("/reset-request")
     public ResponseEntity<?> resetRequest(@RequestBody Map<String, String> payload) {
-        String email = payload.get("email");
-        if (email == null) return ResponseEntity.badRequest().body(Map.of("error", "email required"));
+        String email = payload.get("email") == null ? "" : payload.get("email").trim();
+        if (email.isEmpty()) return ResponseEntity.badRequest().body(Map.of("error", "email required", "message", "Escribe tu correo."));
+        if (!correo.configurado()) {
+            return ResponseEntity.status(503).body(Map.of("error", "mail-not-configured",
+                    "message", "El envío de correos no está configurado en SOGO. Pide al administrador que restablezca tu contraseña."));
+        }
         var uOpt = userService.findByEmail(email);
-        if (uOpt.isEmpty()) return ResponseEntity.ok(Map.of("message", "If the email exists, a reset link was sent."));
-        User u = uOpt.get();
-        String reset = userService.createResetTokenFor(u);
-        // In development we log the reset link. In production, send email.
-        String link = frontendUrl + "/reset?token=" + reset;
-        System.out.println("[RESET LINK] " + link + " for " + u.getEmail());
-        return ResponseEntity.ok(Map.of("message", "reset link created (dev).", "link", link));
+        if (uOpt.isPresent()) {
+            var u = uOpt.get();
+            String reset = userService.createResetTokenFor(u);
+            String nombre = u.getNombre() == null ? "" : u.getNombre();
+            if (!correo.enviarRecuperacion(u.getEmail(), nombre, frontendUrl + "/reset?token=" + reset)) {
+                return ResponseEntity.status(502).body(Map.of("error", "mail-failed",
+                        "message", "No se pudo enviar el correo en este momento. Intenta de nuevo en unos minutos."));
+            }
+        }
+        return ResponseEntity.ok(Map.of("message", "Si el correo pertenece a una cuenta de SOGO, te enviamos un enlace para restablecer la contraseña. Revisa tu bandeja de entrada y la carpeta de spam."));
     }
 
     @PostMapping("/reset")

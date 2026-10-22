@@ -1,8 +1,9 @@
 import { Room, summarizeRooms, bathroomLabel } from './room.model';
 
 // Catálogo físico de la casa (vivienda turística en Filandia): 2 pisos que se
-// alquilan por habitación, por piso completo o como casa completa. Es la única
-// fuente de habitaciones: Alojamiento, Reservas y TRA la leen de aquí.
+// alquilan por habitación, por piso completo o como casa completa. Alojamiento,
+// Reservas y TRA leen las habitaciones de aquí. Al iniciar sesión, RoomService
+// reemplaza estos datos con la tabla `habitaciones` (se conservan las fotos).
 // Piso 1: 3 habitaciones · 8 personas · 3 camas dobles · 1 camarote
 // Piso 2: 4 habitaciones · 12 personas · 4 camas dobles · 2 camarotes
 // Casa completa: 7 habitaciones · 20 personas · 7 camas dobles · 3 camarotes

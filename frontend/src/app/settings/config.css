@@ -1,0 +1,50 @@
+/* Configuración — complementa page-kit.css y kit.css */
+
+.cf-head-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.cf-meta { font-size: 11.5px; color: #6B7280; }
+.cf-dirty { font-size: 11.5px; font-weight: 700; color: #B45309; }
+
+.cf-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 18px; align-items: start; }
+.cf-col { display: flex; flex-direction: column; gap: 16px; }
+.cf-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+
+.cf-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.cf-fields--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cf-fields--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cf-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: #374151; min-width: 0; }
+.cf-field small { font-weight: 400; font-size: 11.5px; color: #6B7280; line-height: 1.4; }
+.cf-field small.err { color: #B42318; }
+.cf-field .rsv-input.invalid { border-color: #D9534F; background: #FFF8F7; }
+
+/* Filas de ajuste: título + descripción a la izquierda, control a la derecha */
+.cf-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid #EEF1F5; }
+.cf-row:last-child { border-bottom: none; }
+.cf-row > div:first-child { min-width: 0; }
+.cf-row strong { display: block; font-size: 13px; color: #0A2540; }
+.cf-row small { display: block; font-size: 11.5px; color: #6B7280; margin-top: 2px; line-height: 1.4; }
+.cf-row small a { color: #0B6FD0; }
+.cf-row select.rsv-input { width: auto; min-width: 170px; }
+.cf-unit { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #D5DEEA; border-radius: 10px; padding: 0 10px; height: 38px; background: #fff; }
+.cf-unit input { width: 56px; border: none; outline: none; font: inherit; font-size: 13px; font-weight: 600; color: #0A2540; text-align: right; background: transparent; }
+.cf-unit input.wide { width: 110px; }
+.cf-unit span { font-size: 11.5px; color: #6B7280; }
+.cf-unit.invalid { border-color: #D9534F; background: #FFF8F7; }
+
+.cf-table td.r, .cf-table th.r { text-align: right; }
+.cf-table td.c, .cf-table th.c { text-align: center; }
+.cf-table .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: #4B5563; }
+.cf-table tr.off td { color: #9AA5B4; }
+.cf-table input.rsv-input { height: 34px; padding: 0 8px; }
+.cf-pct { display: inline-flex; align-items: center; gap: 4px; }
+.cf-pct input { width: 64px; height: 32px; border: 1px solid #D5DEEA; border-radius: 8px; text-align: right; font: inherit; font-size: 13px; font-weight: 700; color: #0A2540; padding: 0 6px; }
+
+.cf-note { margin: 10px 0 0; font-size: 11.5px; color: #6B7280; line-height: 1.5; }
+.cf-card-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.cf-card-head .kit-card-title { margin: 0; }
+.cf-check { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; color: #1F2937; }
+.cf-check svg { width: 15px; height: 15px; fill: none; stroke: #1F8A5B; stroke-width: 2; flex-shrink: 0; }
+.cf-preview { background: #F6F8FB; border-radius: 10px; padding: 10px 12px; }
+.cf-chip { display: inline-block; background: #EEF2F7; color: #374151; border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 600; margin: 2px 4px 2px 0; }
+
+@media (max-width: 1100px) { .cf-grid, .cf-two { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .cf-fields, .cf-fields--3, .cf-fields--4 { grid-template-columns: 1fr; } }

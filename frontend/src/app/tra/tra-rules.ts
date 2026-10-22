@@ -119,7 +119,6 @@ export function validate(rec: TraRecord, r: Reservation, settings: TraSettings, 
   const rnt = !!settings.rnt.trim();
   const token = !!settings.tokenLast4 && settings.integrationActive;
   if (!rnt) issues.push({ message: 'El RNT no está configurado (Configuración TRA)' });
-  if (!token) issues.push({ message: 'El token PMS no está configurado o la integración está inactiva' });
 
   // 3. Principal
   const principalIssues = guestIssues(rec, principal);
@@ -218,7 +217,8 @@ function placeFrom(text: string): { country: string; city: string } {
 export function draftFor(r: Reservation, units: LodgingUnit[], now: string): TraRecord {
   const ids = unitIdsFor(r);
   const share = Math.floor(r.lodgingAmount / ids.length);
-  const [firstNames, lastNames] = splitName(r.guestName);
+  // Nombres y apellidos tal como se registraron en la reserva; si es antigua (un solo campo), se separan
+  const [firstNames, lastNames] = r.lastName?.trim() ? [r.firstName ?? '', r.lastName] : splitName(r.guestName);
   const home = placeFrom(r.city);
   return {
     reservationId: r.id,

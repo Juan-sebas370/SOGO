@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -58,7 +58,7 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
 
   <div class="tra-alert tra-alert--ok" *ngIf="savedAt">
     <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-    <div class="tra-alert-body">Borrador guardado a las {{ savedAt }}. La TRA se enviará al confirmar el check-in.</div>
+    <div class="tra-alert-body">Guardado en la base de datos a las {{ savedAt }} (se guarda solo mientras escribes). La TRA se reporta al confirmar el check-in.</div>
   </div>
 
   <div class="tra-layout">
@@ -411,7 +411,7 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
   </ng-template>
   `
 })
-export class TraRegistrationComponent {
+export class TraRegistrationComponent implements OnDestroy {
 
   readonly documentTypes = DOCUMENT_TYPES;
   readonly reasons = TRAVEL_REASONS;
@@ -432,6 +432,10 @@ export class TraRegistrationComponent {
   savedAt = '';
   minorForm?: MinorForm;
   private units: LodgingUnit[] = [];
+  /** Lo último guardado: si el formulario cambia, se guarda solo (cada pocos segundos y al salir). */
+  private lastSaved = '';
+  private autosave?: ReturnType<typeof setInterval>;
+  private readonly onUnload = () => this.flush();
 
   constructor(private svc: TraService, private router: Router, route: ActivatedRoute) {
     const id = route.snapshot.paramMap.get('id')!;
@@ -442,7 +446,30 @@ export class TraRegistrationComponent {
     if (this.rec) {
       this.editable = this.svc.isEditable(this.rec);
       this.showErrors = this.rec.status === 'REQUIERE_CORRECCION';
+      this.lastSaved = this.snapshot();
+      if (this.editable) {
+        this.autosave = setInterval(() => this.flush(), 4000);
+        window.addEventListener('beforeunload', this.onUnload);
+      }
     }
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.autosave);
+    window.removeEventListener('beforeunload', this.onUnload);
+    this.flush();
+  }
+
+  private snapshot(): string { return this.rec ? JSON.stringify({ u: this.rec.units, g: this.rec.guests }) : ''; }
+
+  /** Guarda en la base lo que cambió desde el último guardado (sin pulsar ningún botón). */
+  private flush(): void {
+    if (!this.rec || !this.editable) return;
+    const now = this.snapshot();
+    if (now === this.lastSaved) return;
+    this.svc.saveRegistration(this.rec.reservationId, this.rec.units, this.rec.guests, true);
+    this.lastSaved = now;
+    this.savedAt = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
   }
 
   // ── Derivados ──
@@ -523,7 +550,7 @@ export class TraRegistrationComponent {
     const m = this.minorForm!;
     m.guest.minorCheck = {
       verified: true, travelsWith: m.travelsWith, support: m.support,
-      verifiedBy: localStorage.getItem('sogo_role') || 'Administrador', verifiedAt: isoDateTime(),
+      verifiedBy: this.svc.actorName, verifiedAt: isoDateTime(),
     };
     this.minorForm = undefined;
   }
@@ -531,6 +558,7 @@ export class TraRegistrationComponent {
   // ── Guardar / validar ──
   save(): void {
     this.svc.saveRegistration(this.rec!.reservationId, this.rec!.units, this.rec!.guests);
+    this.lastSaved = this.snapshot();
     this.savedAt = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
   }
 

@@ -13,7 +13,7 @@ type StateFilter = 'Todos excepto anuladas' | 'Todos' | InvoiceState;
 interface Filters { from: string; to: string; state: StateFilter; client: string; service: ConceptCategory | ''; }
 interface Row { inv: Invoice; state: InvoiceState; t: InvoiceTotals; }
 
-const SERVICES: ConceptCategory[] = ['Alojamiento', 'Restaurante', 'Minibar', 'Lavandería', 'Eventos y pasadías', 'Otro'];
+const SERVICES: ConceptCategory[] = ['Alojamiento', 'Daños y faltantes', 'Lavandería', 'Eventos y pasadías', 'Otro'];
 
 @Component({
   selector: 'app-invoice-reports',
@@ -174,7 +174,7 @@ export class InvoiceReportsComponent {
   readonly dateTime = fmtDateTime;
   readonly dayMonth = dayMonth;
   readonly max = Math.max;
-  readonly user = localStorage.getItem('sogo_role') || 'Usuario';
+  get user(): string { return this.audit.actor(); }
 
   draft: Filters = { from: isoDate(-29), to: isoDate(0), state: 'Todos excepto anuladas', client: '', service: '' };
   f: Filters = { ...this.draft };

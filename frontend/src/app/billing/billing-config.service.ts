@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
 import { ConceptCategory, TaxKind } from './invoice.model';
-import { isoDate, isoDateTime } from '../shared/date-utils';
+import { UsersService } from '../users/users.service';
+import { HotelService } from '../shared/hotel.service';
+import { API_URL } from '../api';
 
 export type TaxConcept = ConceptCategory | 'Alojamiento · extranjero no residente';
 export type TaxRuleStatus = 'Activo' | 'Validar con contador' | 'Inactivo';
@@ -15,142 +18,157 @@ export interface TaxRule {
   status:    TaxRuleStatus;
 }
 
+/** Acciones de Facturación. Se autorizan con los permisos del módulo en Usuarios y roles. */
 export type BillingAction =
   'Generar factura' | 'Validar datos fiscales' | 'Consultar facturas' | 'Descargar y enviar' |
   'Generar reportes' | 'Anular con nota crédito' | 'Configurar integración';
 
-export type PermissionRole = 'Admin' | 'Recep.' | 'Contador';
+/** Acción de Facturación → [módulo, permiso] de Usuarios y roles (el servidor exige lo mismo). */
+export const ACTION_PERMISSION: Record<BillingAction, [string, 'view' | 'create' | 'edit' | 'delete' | 'export']> = {
+  'Consultar facturas':      ['Facturación', 'view'],
+  'Generar factura':         ['Facturación', 'create'],
+  'Validar datos fiscales':  ['Facturación', 'edit'],
+  'Descargar y enviar':      ['Facturación', 'export'],
+  'Generar reportes':        ['Facturación', 'export'],
+  'Anular con nota crédito': ['Facturación', 'delete'],
+  'Configurar integración':  ['Configuración', 'edit'],
+};
+
+/** Datos del emisor en facturas y documentos: salen de Configuración › Datos del hospedaje. */
+export interface Issuer {
+  name: string; legalName: string; nit: string; rnt: string; establishment: string;
+  address: string; city: string; phone: string; email: string; website: string; logo: string;
+}
 
 export interface BillingConfig {
-  issuer: {
-    name:    string;
-    nit:     string;
-    rnt:     string;
-    address: string;
-    city:    string;
-    phone:   string;
-    email:   string;
-  };
   provider: {
     name:         string;
     apiUrl:       string;
     environment:  'Habilitación' | 'Producción';
     clientId:     string;
-    apiKey:       string;
+    apiKey:       string;       // solo para escribir una nueva: el servidor nunca la devuelve
+    apiKeySet?:   boolean;
     lastResponse: string;
     connected:    boolean;
   };
   resolution: {
-    number:    string;
-    prefix:    string;
-    from:      number;
-    to:        number;
-    validFrom: string;
-    validTo:   string;
+    number:       string;
+    prefix:       string;
+    from:         number;
+    to:           number;
+    validFrom:    string | null;
+    validTo:      string | null;
+    technicalKey: string;
+    creditPrefix: string;       // prefijo de las notas crédito electrónicas
   };
   taxes: TaxRule[];
-  automation: {
-    sendOnIssue:   boolean;
-    emailOnAccept: boolean;
-    retry:         boolean;
-  };
+  automation: { emailOnAccept: boolean };
   emailSubject: string;
   emailBody:    string;
-  permissions:  Record<BillingAction, Record<PermissionRole, boolean>>;
 }
 
-export const BILLING_ACTIONS: BillingAction[] = [
-  'Generar factura', 'Validar datos fiscales', 'Consultar facturas', 'Descargar y enviar',
-  'Generar reportes', 'Anular con nota crédito', 'Configurar integración',
-];
-export const PERMISSION_ROLES: PermissionRole[] = ['Admin', 'Recep.', 'Contador'];
+/** Configuración con el emisor (Datos del hospedaje) ya resuelto, para quien la lee. */
+export type BillingView = BillingConfig & { issuer: Issuer };
 
-// Rol del sistema → columna de la matriz de permisos. Gerente usa los permisos de Admin.
-const ROLE_COLUMN: Record<string, PermissionRole> = {
-  'Administrador': 'Admin', 'Gerente': 'Admin', 'Recepcionista': 'Recep.', 'Contador': 'Contador',
-};
-
-const all = (admin: boolean, recep: boolean, contador: boolean) => ({ 'Admin': admin, 'Recep.': recep, 'Contador': contador });
-
-function defaults(): BillingConfig {
+/** Estructura vacía mientras carga o si aún no se ha ejecutado el script 23: nada inventado. */
+function empty(): BillingConfig {
   return {
-    // Los datos reales del emisor y del proveedor van donde hay corchetes
-    issuer: {
-      name: 'Hospedaje Sebastián', nit: '[NIT del emisor]', rnt: '[N.º RNT]',
-      address: '[Dirección]', city: 'Filandia, Quindío', phone: '[Teléfono]', email: '[Correo]',
-    },
-    provider: {
-      name: '[Proveedor autorizado]', apiUrl: '[URL del proveedor]', environment: 'Producción',
-      clientId: '[ID de cliente]', apiKey: 'sk_live_4f8a2c9e0b7d1a3f9C1D',
-      lastResponse: `${isoDate(0)}T08:00 · Conexión correcta`, connected: true,
-    },
-    resolution: {
-      number: '[N.º de resolución]', prefix: 'FE', from: 1001, to: 5000,
-      validFrom: isoDate(-180), validTo: isoDate(550),
-    },
-    taxes: [
-      { id: 't1', concept: 'Alojamiento', kind: 'IVA', rate: 0.19, condition: 'General', status: 'Activo' },
-      { id: 't2', concept: 'Alojamiento · extranjero no residente', kind: 'IVA', rate: 0, condition: 'Pasaporte y sin residencia en Colombia', status: 'Validar con contador' },
-      { id: 't3', concept: 'Restaurante', kind: 'INC', rate: 0.08, condition: 'Impuesto al consumo', status: 'Activo' },
-      { id: 't4', concept: 'Minibar', kind: 'IVA', rate: 0.19, condition: 'General', status: 'Activo' },
-      { id: 't5', concept: 'Eventos y pasadías', kind: 'IVA', rate: 0.19, condition: 'General', status: 'Activo' },
-      { id: 't6', concept: 'Lavandería', kind: 'IVA', rate: 0.19, condition: 'General', status: 'Activo' },
-      { id: 't7', concept: 'Otro', kind: 'IVA', rate: 0.19, condition: 'General', status: 'Activo' },
-    ],
-    automation: { sendOnIssue: true, emailOnAccept: true, retry: true },
-    emailSubject: 'Factura electrónica {número} · Hospedaje Sebastián',
-    emailBody: 'Hola {huésped}, gracias por hospedarte con nosotros en Filandia. Adjuntamos la factura electrónica {número} correspondiente a tu estadía del {fechas}. Cualquier inquietud, responde a este correo.',
-    permissions: {
-      'Generar factura':         all(true, true, true),
-      'Validar datos fiscales':  all(true, true, true),
-      'Consultar facturas':      all(true, true, true),
-      'Descargar y enviar':      all(true, true, true),
-      'Generar reportes':        all(true, false, true),
-      'Anular con nota crédito': all(true, false, true),
-      'Configurar integración':  all(true, false, false),
-    },
+    provider: { name: '', apiUrl: '', environment: 'Habilitación', clientId: '', apiKey: '', apiKeySet: false, lastResponse: '', connected: false },
+    resolution: { number: '', prefix: 'FE', from: 1, to: 1, validFrom: null, validTo: null, technicalKey: '', creditPrefix: 'NCE' },
+    taxes: [], automation: { emailOnAccept: true }, emailSubject: '', emailBody: '',
+  };
+}
+
+function merge(v: Partial<BillingConfig> | null): BillingConfig {
+  const e = empty();
+  return {
+    ...e, ...(v ?? {}),
+    provider: { ...e.provider, ...(v?.provider ?? {}) },
+    resolution: { ...e.resolution, ...(v?.resolution ?? {}) },
+    automation: { ...e.automation, ...(v?.automation ?? {}) },
+    taxes: v?.taxes ?? [],
   };
 }
 
 @Injectable({ providedIn: 'root' })
 export class BillingConfigService {
 
-  private config$ = new BehaviorSubject<BillingConfig>(defaults());
+  private readonly base = `${API_URL}/facturacion/config`;
+  private config$ = new BehaviorSubject<BillingConfig>(empty());
+  private loading?: Promise<void>;
+  private loadedFor = '';
 
-  get(): BillingConfig { return this.config$.value; }
+  constructor(private http: HttpClient, private users: UsersService, private hotel: HotelService) {}
+
+  ready(): Promise<void> {
+    const token = localStorage.getItem('sogo_token') || '';
+    if (!this.loading || token !== this.loadedFor) {
+      this.loadedFor = token;
+      this.loading = token
+        ? firstValueFrom(this.http.get<Partial<BillingConfig> | null>(this.base))
+            .then(v => this.config$.next(merge(v)))
+            .catch(e => console.error('No se pudo cargar la configuración de facturación', e))
+        : Promise.resolve();
+    }
+    return this.loading;
+  }
+
+  /** Configuración + emisor. */
+  get(): BillingView { return { ...this.config$.value, issuer: this.issuer }; }
+  /** Solo lo que se guarda (para editar). */
+  raw(): BillingConfig { return structuredClone(this.config$.value); }
   changes(): Observable<BillingConfig> { return this.config$.asObservable(); }
 
-  save(config: BillingConfig): void {
-    this.config$.next(structuredClone(config));
+  get issuer(): Issuer {
+    const h = this.hotel.get();
+    return {
+      name: this.hotel.name, legalName: h.legalName, nit: h.nit, rnt: h.rnt, establishment: h.establishment,
+      address: h.address, city: this.hotel.city, phone: this.hotel.phones, email: h.email, website: h.website, logo: this.hotel.logoSrc,
+    };
+  }
+
+  /** Guarda en el servidor (que valida rango, prefijos y tarifas). */
+  async save(config: BillingConfig): Promise<void> {
+    const saved = await firstValueFrom(this.http.put<BillingConfig>(this.base, config));
+    this.config$.next(merge(saved));
   }
 
   /** Tarifa aplicable a un concepto. Los no residentes con pasaporte usan la exención de alojamiento. */
   taxFor(category: ConceptCategory, foreignNonResident = false): TaxRule {
-    const taxes = this.get().taxes.filter(t => t.status !== 'Inactivo');
+    const taxes = this.config$.value.taxes.filter(t => t.status !== 'Inactivo');
     if (category === 'Alojamiento' && foreignNonResident) {
       const exempt = taxes.find(t => t.concept === 'Alojamiento · extranjero no residente');
       if (exempt) return exempt;
     }
-    return taxes.find(t => t.concept === category) ?? taxes.find(t => t.concept === 'Otro')!;
+    // Sin tarifa configurada: 0 % con aviso (la pantalla de emisión lo muestra como pendiente)
+    return taxes.find(t => t.concept === category) ?? taxes.find(t => t.concept === 'Otro')
+      ?? { id: '', concept: category, kind: 'IVA', rate: 0, condition: 'Sin tarifa configurada', status: 'Validar con contador' };
   }
 
-  /** ¿El usuario actual puede hacer esta acción? Según la matriz de permisos por rol. */
+  /** ¿El usuario actual puede hacer esta acción? Según sus permisos en Usuarios y roles. */
   can(action: BillingAction): boolean {
-    const column = ROLE_COLUMN[localStorage.getItem('sogo_role') ?? ''];
-    return !!column && this.get().permissions[action][column];
+    const [module, perm] = ACTION_PERMISSION[action];
+    return this.users.can(module as any, perm);
   }
 
-  /**
-   * Prueba de conexión con el proveedor. Sin backend todavía: se simula la
-   * respuesta; aquí es donde el servidor llamará al proveedor real.
-   */
-  testConnection(): Promise<{ ok: boolean; message: string }> {
-    return new Promise(resolve => setTimeout(() => {
-      const c = this.get();
-      const ok = !!c.provider.clientId.trim() && !!c.provider.apiKey.trim() && !!c.provider.apiUrl.trim();
-      const message = ok ? 'Conexión correcta' : 'Faltan credenciales';
-      this.save({ ...c, provider: { ...c.provider, connected: ok, lastResponse: `${isoDateTime()} · ${message}` } });
-      resolve({ ok, message });
-    }, 900));
+  /** Prueba real de conexión: la hace el servidor contra la URL del proveedor. */
+  async testConnection(): Promise<{ ok: boolean; message: string }> {
+    const r = await firstValueFrom(this.http.post<{ ok: boolean; message: string; config: BillingConfig }>(`${this.base}/probar`, {}));
+    this.config$.next(merge(r.config));
+    return { ok: r.ok, message: r.message };
+  }
+
+  // ── Estado de la resolución ──
+
+  /** Problemas de la configuración que impiden emitir (vacío = lista). */
+  issueBlockers(): string[] {
+    const c = this.config$.value, h = this.hotel.get(), today = new Date().toISOString().slice(0, 10);
+    const out: string[] = [];
+    if (!h.nit.trim()) out.push('Falta el NIT del hospedaje (Configuración › Datos del hospedaje).');
+    if (!c.resolution.number.trim()) out.push('Falta el número de la resolución de facturación DIAN.');
+    if (!c.resolution.validFrom || !c.resolution.validTo) out.push('Falta la vigencia de la resolución.');
+    else if (today < c.resolution.validFrom || today > c.resolution.validTo) out.push('La resolución de facturación no está vigente.');
+    if (!c.taxes.some(t => t.status !== 'Inactivo')) out.push('No hay tarifas de impuestos configuradas.');
+    return out;
   }
 }

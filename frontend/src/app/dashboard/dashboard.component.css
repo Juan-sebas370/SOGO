@@ -24,32 +24,20 @@
   overflow-y: auto;
 }
 
-/* Logo */
+/* Logo (versión para fondo oscuro) */
 .dash-brand {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 20px 20px 16px;
+  justify-content: center;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   margin-bottom: 8px;
 }
 
-.dash-brand-icon {
-  font-size: 22px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.05em;
-  font-family: 'Playfair Display', serif;
-  line-height: 1;
-}
-
-.dash-brand-text {
-  font-family: 'Poppins', sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.06em;
+.dash-brand-logo {
+  width: 132px;
+  height: auto;
+  display: block;
 }
 
 /* Nav items */
@@ -110,6 +98,91 @@
 .dash-nav-item--static:hover {
   opacity: 1;
 }
+
+/* Módulo con submenú: enlace + flecha desplegable */
+.dash-nav-row {
+  position: relative;
+}
+
+.dash-nav-row .dash-nav-item {
+  padding-right: 40px;
+}
+
+.dash-nav-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: rgba(255,255,255,0.68);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dash-nav-toggle:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.dash-nav-toggle:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.dash-nav-row:has(.dash-nav-item.active) .dash-nav-toggle { color: #fff; }
+
+.dash-nav-toggle svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.2s ease;
+}
+
+.dash-nav-group.open .dash-nav-toggle svg { transform: rotate(180deg); }
+
+/* Despliegue animado: la fila del grid pasa de 0fr a 1fr */
+.dash-subnav-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.22s ease, visibility 0.22s;
+}
+
+.dash-nav-group.open .dash-subnav-wrap {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+.dash-subnav-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Submenú de un módulo */
+.dash-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px 22px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255,255,255,0.15);
+}
+
+.dash-subnav-item {
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: rgba(255,255,255,0.68);
+  text-decoration: none;
+  font-size: 12.5px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dash-subnav-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.dash-subnav-item.active { background: rgba(255,255,255,0.14); color: #fff; font-weight: 600; }
 
 /* Logout */
 .dash-logout {
@@ -495,11 +568,68 @@
   .dash-page { grid-template-columns: 190px 1fr; }
 }
 
+/* Botón ☰ y fondo: solo en pantallas pequeñas */
+.dash-menu-btn { display: none; }
+.dash-backdrop { display: none; }
+
 @media (max-width: 768px) {
   .dash-page  { grid-template-columns: 1fr; }
-  .dash-sidebar { display: none; }
-  .dash-topbar  { padding: 12px 16px; flex-wrap: wrap; gap: 12px; }
+
+  /* El menú lateral pasa a ser un panel que se desliza desde la izquierda */
+  .dash-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 82vw);
+    z-index: 50;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.25s ease, visibility 0.25s;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25);
+  }
+  .dash-sidebar.open { transform: none; visibility: visible; }
+
+  .dash-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(11,46,82,0.45);
+  }
+
+  .dash-menu-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    padding: 0;
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    background: #fff;
+    color: #0A3D6D;
+    cursor: pointer;
+  }
+  .dash-menu-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  /* Táctil: objetivos más grandes */
+  .dash-nav-item { padding: 12px; font-size: 14px; }
+  .dash-nav-toggle { width: 36px; height: 36px; }
+  .dash-subnav-item { padding: 9px 10px; font-size: 13.5px; }
+
+  .dash-topbar  { padding: 12px 16px; flex-wrap: wrap; gap: 12px; justify-content: flex-start; }
+  .dash-topbar-left { flex: 1; min-width: 0; }
+  .dash-welcome-name { font-size: 20px; }
   .dash-content { padding: 16px; gap: 16px; }
   .dash-date-pill span:first-of-type { display: none; }
   .dash-notif-panel { width: min(340px, 92vw); right: -8px; }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-sidebar, .dash-subnav-wrap, .dash-nav-toggle svg { transition: none; }
+}
+
+/* Número de mensajes nuevos de la página web */
+.dash-nav-count { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #F59E0B; color: #1F2937; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }

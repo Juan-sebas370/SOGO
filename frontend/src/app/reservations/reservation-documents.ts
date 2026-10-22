@@ -9,7 +9,7 @@ import { esc, openDocument, downloadCsvFile } from '../shared/documents';
 
 function header(title: string, r: Reservation): string {
   return `<header><div><h1>${esc(title)}</h1><div class="muted">Reserva ${esc(r.code)} · generado el ${esc(fmtDateTime(isoDateTime()))}</div></div>
-  <div class="brand">SOGO<div class="muted" style="font-size:11px;font-weight:400">Hospedaje Sebastián</div></div></header>`;
+</header>`;
 }
 
 /** Planilla / confirmación de la reserva. */

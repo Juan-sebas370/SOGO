@@ -3,7 +3,11 @@ export type ReservationType   = 'Individual' | 'Grupo familiar' | 'Grupo de trab
 // Habitación: una o varias habitaciones sueltas · Piso: el piso completo · Casa completa: todos los pisos
 export type LodgingType       = 'Habitación' | 'Piso' | 'Casa completa';
 export type PaymentStatus     = 'Pagado' | 'Parcial' | 'Pendiente';
-export type PaymentMethod     = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Transferencia' | 'Tarjeta';
+// Wompi: pagos en línea hechos desde la página web del hospedaje
+export type PaymentMethod     = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Transferencia' | 'Tarjeta' | 'Wompi';
+// Por dónde llegó la reserva (Reportes la usa para la mezcla de canales)
+export type ReservationChannel = 'Web' | 'Directo' | 'Booking' | 'Airbnb' | 'Walk-in';
+export const CHANNELS: ReservationChannel[] = ['Web', 'Directo', 'Booking', 'Airbnb', 'Walk-in'];
 
 export interface Payment {
   date:    string;          // YYYY-MM-DDTHH:mm
@@ -16,7 +20,9 @@ export interface Reservation {
   id:              string;
   code:            string;          // RSV-2026-00125
   // Huésped principal
-  guestName:       string;
+  guestName:       string;          // nombre completo (nombres + apellidos)
+  firstName?:      string;          // nombres
+  lastName?:       string;          // apellidos
   docType:         string;
   docNumber:       string;
   phone:           string;
@@ -24,6 +30,7 @@ export interface Reservation {
   city:            string;          // Ciudad / Departamento de residencia
   // Reserva
   reservationType: ReservationType;
+  channel:         ReservationChannel;
   lodgingType:     LodgingType;
   floor?:          number;          // solo cuando lodgingType === 'Piso'
   rooms:           string[];        // números de habitación incluidos
@@ -46,6 +53,7 @@ export interface Reservation {
   createdAt:       string;          // YYYY-MM-DDTHH:mm
   updatedAt:       string;
   cancelReason?:   string;
+  dataConsentAt?:  string;          // autorización de tratamiento de datos (Ley 1581)
 }
 
 export function totalAmount(r: Reservation): number {
@@ -99,4 +107,14 @@ export function awaitsCheckIn(r: Reservation): boolean {
 /** Una reserva que ya no ocurrirá: no cuenta para ocupación, pagos ni llegadas. */
 export function isVoid(r: Reservation): boolean {
   return r.status === 'Cancelada' || r.status === 'No presentada';
+}
+
+/**
+ * Separa un nombre completo guardado en un solo campo: 2 palabras → 1 nombre + 1 apellido,
+ * 3 → 1 + 2, 4 o más → mitad y mitad. Solo es una sugerencia que se revisa en el formulario.
+ */
+export function splitFullName(name: string): [string, string] {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const n = words.length <= 2 ? 1 : words.length === 3 ? 1 : Math.ceil(words.length / 2);
+  return [words.slice(0, n).join(' '), words.slice(n).join(' ')];
 }

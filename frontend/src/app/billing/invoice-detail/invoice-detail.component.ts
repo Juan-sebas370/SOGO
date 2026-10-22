@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { InvoiceService } from '../invoice.service';
 import { BillingConfigService } from '../billing-config.service';
-import { Invoice, InvoiceState, EMAIL_RE, computeTotals, lineNet, taxLabel } from '../invoice.model';
+import { Invoice, InvoiceState, EMAIL_RE, computeTotals, lineNet, taxLabel, checkCufe, dianLookupUrl } from '../invoice.model';
 import { DIAN_BADGE, dayMonth } from '../billing-format';
 import { ReservationService } from '../../reservations/reservation.service';
 import { PaymentMethod, lodgingLabel } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
+import { toast } from '../../shared/toast/toast.service';
+import { serverMessage } from '../../shared/toast/notify.interceptor';
 
 type Panel = 'Correo' | 'WhatsApp' | null;
 type SendState = 'draft' | 'sending' | 'sent' | 'error';
@@ -44,7 +46,8 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
         <strong [ngClass]="'det-pay--' + state">{{ state }}{{ balance && state !== 'Anulada' ? ' · saldo ' + money(balance) : '' }}</strong>
         <button type="button" class="det-inline-link" *ngIf="balance > 0 && !inv.annulment" (click)="openPayment()">Registrar pago</button>
       </div>
-      <div class="det-cufe"><span>CUFE</span><code>{{ inv.cufe || (inv.dianStatus === 'Rechazada' ? 'Sin CUFE: rechazada' : 'Pendiente de la DIAN') }}</code></div>
+      <div class="det-cufe"><span>CUFE</span><code>{{ inv.cufe || (inv.dianStatus === 'Rechazada' ? 'Sin CUFE: rechazada' : 'Pendiente de la DIAN') }}</code>
+        <a *ngIf="inv.cufe" class="det-inline-link" [href]="lookup(inv.cufe)" target="_blank" rel="noopener">Consultar en la DIAN</a></div>
     </section>
 
     <div class="bil-alert" *ngIf="inv.dianStatus === 'Rechazada' && !inv.annulment" role="alert">
@@ -52,10 +55,10 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
       <p><strong>Rechazada por la DIAN.</strong> Motivo informado por el proveedor: {{ inv.rejectionReason }}. Corrige los datos fiscales y reenvía; el número se conserva.</p>
       <a class="bil-alert-btn" [routerLink]="['/dashboard/billing', inv.id, 'corregir']">Corregir y reenviar</a>
     </div>
-    <div class="bil-alert bil-alert--warn" *ngIf="inv.dianStatus === 'En validación'" role="status">
+    <div class="bil-alert bil-alert--warn" *ngIf="inv.dianStatus === 'En validación' && !inv.annulment" role="status">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
-      <p><strong>La DIAN está validando la factura.</strong> El envío al huésped y el XML se habilitan cuando sea aceptada.</p>
-      <button type="button" class="bil-alert-btn" (click)="checkStatus()">Consultar estado</button>
+      <p><strong>Pendiente de validación DIAN.</strong> Valídala con el proveedor tecnológico{{ providerName ? ' (' + providerName + ')' : '' }} y registra aquí su respuesta: el CUFE si fue aceptada o el motivo si fue rechazada. El envío al huésped se habilita cuando sea aceptada.</p>
+      <button type="button" class="bil-alert-btn" *ngIf="canValidate" (click)="openDian()">Registrar respuesta</button>
     </div>
     <div class="bil-alert bil-alert--info" *ngIf="inv.annulment as a">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
@@ -69,10 +72,6 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
           <button type="button" class="det-tile" [disabled]="!canShare" (click)="downloadPdf()">
             <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Descargar PDF
-          </button>
-          <button type="button" class="det-tile" [disabled]="!canShare || !accepted" (click)="downloadXml()" [title]="accepted ? '' : 'Disponible cuando la DIAN acepte la factura'">
-            <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            Descargar XML
           </button>
           <button type="button" class="det-tile" [disabled]="!canShare" (click)="print()">
             <svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -127,11 +126,7 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
               <textarea id="m-body" rows="4" class="rsv-input" [(ngModel)]="mail.body"></textarea>
               <small class="det-help">Asunto y mensaje predeterminados · puedes personalizarlos antes de enviar</small>
             </div>
-            <div class="det-attachments">
-              <span>Adjuntos:</span>
-              <span class="det-file det-file--pdf">{{ inv.number }}.pdf</span>
-              <span class="det-file">{{ inv.number }}.xml · {{ xmlSize }}</span>
-            </div>
+            <p class="det-help">El correo sale de la cuenta de SOGO con el mensaje, el detalle de la factura y su CUFE. El PDF y el XML oficiales los entrega el proveedor tecnológico.</p>
 
             <div class="det-mail-preview" *ngIf="mailPreview">
               <p><strong>De:</strong> {{ issuerName }} · <strong>Para:</strong> {{ mail.to }}{{ mail.cc ? ', ' + mail.cc : '' }}</p>
@@ -220,6 +215,44 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
       </div>
     </div>
 
+    <!-- Modal · respuesta de la DIAN -->
+    <div class="rsv-modal-overlay" *ngIf="dian" (click)="dian = undefined">
+      <div class="rsv-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <h3 class="rsv-modal-title">Respuesta de la DIAN · {{ inv.number }}</h3>
+        <p class="rsv-modal-desc">Copia la respuesta que muestra el proveedor tecnológico para esta factura.</p>
+        <div class="det-grid">
+          <label class="det-choice" [class.active]="dian.accepted"><input type="radio" name="dian" [checked]="dian.accepted" (change)="dian.accepted = true"> Aceptada</label>
+          <label class="det-choice" [class.active]="!dian.accepted"><input type="radio" name="dian" [checked]="!dian.accepted" (change)="dian.accepted = false"> Rechazada</label>
+        </div>
+        <ng-container *ngIf="dian.accepted">
+          <div class="det-cufe-help">
+            <strong>¿Qué es el CUFE?</strong>
+            <p>Es el código único que la DIAN le asigna a la factura cuando la acepta: no se inventa ni se calcula en SOGO. Tiene <b>96 caracteres</b> (números 0-9 y letras a-f).</p>
+            <strong>¿Dónde lo encuentro?</strong>
+            <p>En el portal de tu proveedor tecnológico, en el detalle de la factura {{ inv.number }} (campo «CUFE»), en el PDF de la factura debajo del código QR, o en el XML (etiqueta <code>cbc:UUID</code>). También puedes pegar el enlace completo del código QR de la DIAN: SOGO toma el CUFE de ahí.</p>
+          </div>
+          <div class="rsv-field">
+            <label for="d-cufe">CUFE *</label>
+            <textarea id="d-cufe" rows="3" class="rsv-input det-cufe-input" [class.det-cufe-ok]="cufeCheck.value && !cufeCheck.error"
+                      [class.det-cufe-bad]="!!cufeCheck.error" [(ngModel)]="dian.cufe" spellcheck="false"
+                      placeholder="Pega aquí el CUFE (96 caracteres) o el enlace del código QR de la DIAN"></textarea>
+            <small class="det-help" [class.det-ok]="cufeCheck.value.length === 96 && !cufeCheck.error">
+              {{ cufeCheck.value.length }} de 96 caracteres{{ cufeCheck.value.length === 96 && !cufeCheck.error ? ' · CUFE válido' : '' }}{{ dian.cufe && cufeCheck.value !== dian.cufe ? ' · se quitaron espacios o el enlace' : '' }}</small>
+            <small class="nf-err det-err" *ngIf="cufeCheck.error">{{ cufeCheck.error }}</small>
+          </div>
+        </ng-container>
+        <div class="rsv-field" *ngIf="!dian.accepted">
+          <label for="d-reason">Motivo del rechazo *</label>
+          <textarea id="d-reason" rows="3" class="rsv-input" [(ngModel)]="dian.reason" placeholder="Tal como lo informa el proveedor"></textarea>
+        </div>
+        <p class="nf-err det-err" *ngIf="dianError">{{ dianError }}</p>
+        <div class="rsv-modal-footer">
+          <button type="button" class="rsv-btn rsv-btn--outline" (click)="dian = undefined">Cancelar</button>
+          <button type="button" class="rsv-btn rsv-btn--primary" [disabled]="busy || (dian.accepted ? !cufeValid : dian.reason.trim().length < 5)" (click)="saveDian()">Guardar respuesta</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Modal · registrar pago -->
     <div class="rsv-modal-overlay" *ngIf="payForm" (click)="payForm = undefined">
       <div class="rsv-modal" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
@@ -281,6 +314,9 @@ export class InvoiceDetailComponent {
   annulReason = '';
   payForm?: { amount: number; method: PaymentMethod; receipt: string };
   payError = '';
+  dian?: { accepted: boolean; cufe: string; reason: string };
+  dianError = '';
+  busy = false;
 
   constructor(
     private svc: InvoiceService,
@@ -312,10 +348,11 @@ export class InvoiceDetailComponent {
   get canShare(): boolean { return this.config.can('Descargar y enviar'); }
   get canSend(): boolean { return this.canShare && this.accepted; }
   get canAnnul(): boolean { return this.config.can('Anular con nota crédito') && this.accepted; }
+  get canValidate(): boolean { return this.config.can('Validar datos fiscales'); }
   get history() { return [...this.inv!.events].reverse(); }
   get issuerName(): string { return this.config.get().issuer.name; }
+  get providerName(): string { return this.config.get().provider.name; }
   get phoneDigits(): string { const d = this.wa.phone.replace(/\D/g, ''); return d.length >= 10 ? d : ''; }
-  get xmlSize(): string { return `${Math.max(1, Math.round(this.buildXml().length / 1024))} KB`; }
 
   get stayLabel(): string {
     const r = this.reservations.getById(this.inv!.reservationId);
@@ -334,20 +371,22 @@ export class InvoiceDetailComponent {
 
   emailValid(e: string): boolean { return EMAIL_RE.test(e.trim()); }
 
-  // ── Plantillas de mensaje ──
+  // ── Plantillas de mensaje (Facturación › Configuración) ──
   private fill(template: string): string {
     const inv = this.inv!;
     const r = this.reservations.getById(inv.reservationId);
     const fechas = r ? `${dayMonth(r.checkIn)} al ${fmtDate(r.checkOut)}` : '';
     return template
       .replace(/\{número\}/g, inv.number).replace(/\{huésped\}/g, inv.buyer.name.split(' ')[0])
-      .replace(/\{fechas\}/g, fechas).replace(/\{total\}/g, fmtMoney(this.t.total));
+      .replace(/\{fechas\}/g, fechas).replace(/\{total\}/g, fmtMoney(this.t.total)).replace(/\{hospedaje\}/g, this.issuerName);
   }
 
   private resetMessages(): void {
     const c = this.config.get();
-    this.mail = { to: this.inv!.buyer.email, cc: '', subject: this.fill(c.emailSubject), body: this.fill(c.emailBody) };
-    this.wa = { phone: this.inv!.buyer.phone, message: `${this.fill(c.emailBody)} Total: ${fmtMoney(this.t.total)}.` };
+    const subject = c.emailSubject || 'Factura electrónica {número} · {hospedaje}';
+    const body = c.emailBody || 'Hola {huésped}, adjuntamos la factura electrónica {número} de tu estadía del {fechas}, por {total}.';
+    this.mail = { to: this.inv!.buyer.email, cc: '', subject: this.fill(subject), body: this.fill(body) };
+    this.wa = { phone: this.inv!.buyer.phone, message: `${this.fill(body)}${this.inv!.cufe ? ' CUFE: ' + this.inv!.cufe : ''}` };
     this.sendState = 'draft';
   }
 
@@ -366,21 +405,8 @@ export class InvoiceDetailComponent {
     this.router.navigate(['/facturas', this.inv!.id, 'imprimir']);
   }
 
-  downloadXml(): void {
-    const url = URL.createObjectURL(new Blob([this.buildXml()], { type: 'application/xml' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${this.inv!.number}.xml`;
-    a.click();
-    URL.revokeObjectURL(url);
-    this.svc.logDownload(this.inv!.id, 'XML');
-  }
-
-  /**
-   * Envío por correo. Sin backend todavía el envío se simula; se valida el
-   * destinatario y se registra en el historial. El servidor lo enviará con los adjuntos.
-   */
-  sendEmail(): void {
+  /** Envío real: lo hace el servidor con la cuenta de correo de SOGO. */
+  async sendEmail(): Promise<void> {
     const bad = [this.mail.to, this.mail.cc].filter(Boolean).find(e => !this.emailValid(e));
     if (!this.mail.to.trim() || bad !== undefined) {
       this.sendState = 'error';
@@ -388,29 +414,65 @@ export class InvoiceDetailComponent {
       return;
     }
     this.sendState = 'sending';
-    setTimeout(() => {
-      this.svc.send(this.inv!.id, 'Correo', [this.mail.to, this.mail.cc].filter(Boolean).join(', '));
+    try {
+      await this.svc.sendEmail(this.inv!.id, this.mail);
       this.sendState = 'sent';
-    }, 900);
+    } catch (e) {
+      this.sendState = 'error';
+      this.sendError = serverMessage(e);
+    }
   }
 
-  sendWhatsApp(): void {
+  async sendWhatsApp(): Promise<void> {
     window.open(`https://wa.me/${this.phoneDigits}?text=${encodeURIComponent(this.wa.message)}`, '_blank');
-    this.svc.send(this.inv!.id, 'WhatsApp', this.wa.phone);
+    await this.svc.logSent(this.inv!.id, 'WhatsApp', this.wa.phone).catch(() => undefined);
   }
 
-  checkStatus(): void { this.svc.checkStatus(this.inv!.id); }
+  /** CUFE limpio (sin espacios ni enlace) y el motivo si no sirve. */
+  get cufeCheck(): { value: string; error: string } { return checkCufe(this.dian?.cufe ?? ''); }
+  get cufeValid(): boolean { const c = this.cufeCheck; return c.value.length === 96 && !c.error; }
+  readonly lookup = dianLookupUrl;
+
+  openDian(): void {
+    this.dianError = '';
+    this.dian = { accepted: true, cufe: '', reason: '' };
+  }
+
+  async saveDian(): Promise<void> {
+    const d = this.dian!;
+    const cufe = this.cufeCheck.value;
+    if (d.accepted && !this.cufeValid) { this.dianError = this.cufeCheck.error || 'Pega el CUFE de 96 caracteres que asignó la DIAN.'; return; }
+    if (!d.accepted && d.reason.trim().length < 5) { this.dianError = 'Escribe el motivo del rechazo.'; return; }
+    this.busy = true;
+    try {
+      await this.svc.registerDianResponse(this.inv!.id, d.accepted ? { accepted: true, cufe } : { accepted: false, reason: d.reason.trim() });
+      toast.success(d.accepted ? 'Factura aceptada por la DIAN' : 'Rechazo registrado', this.inv!.number);
+      this.dian = undefined;
+      this.resetMessages();
+    } catch (e) {
+      this.dianError = serverMessage(e);
+    } finally {
+      this.busy = false;
+    }
+  }
 
   openAnnul(): void {
     this.annulReason = '';
     this.annulOpen = true;
   }
 
-  annul(): void {
-    if (!this.annulReason) return;
-    this.svc.annul(this.inv!.id, this.annulReason);
-    this.annulOpen = false;
-    this.panel = null;
+  async annul(): Promise<void> {
+    if (!this.annulReason || this.busy) return;
+    this.busy = true;
+    try {
+      await this.svc.annul(this.inv!.id, this.annulReason);
+      this.annulOpen = false;
+      this.panel = null;
+    } catch {
+      // El aviso de error lo muestra el interceptor
+    } finally {
+      this.busy = false;
+    }
   }
 
   openPayment(): void {
@@ -418,33 +480,15 @@ export class InvoiceDetailComponent {
     this.payForm = { amount: this.balance, method: 'Efectivo', receipt: '' };
   }
 
-  savePayment(): void {
+  async savePayment(): Promise<void> {
     const f = this.payForm!;
     const amount = +f.amount || 0;
     if (amount <= 0 || amount > this.balance) { this.payError = `El valor debe estar entre 1 y ${fmtMoney(this.balance)}.`; return; }
-    this.svc.registerPayment(this.inv!.id, amount, f.method, f.receipt.trim());
-    this.payForm = undefined;
-  }
-
-  /** XML simplificado de la factura (el definitivo en formato UBL 2.1 lo devuelve el proveedor). */
-  private buildXml(): string {
-    const inv = this.inv!;
-    const esc = (v: unknown) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    const t = this.t;
-    const lines = this.includedLines.map((l, i) =>
-      `    <Linea n="${i + 1}"><Descripcion>${esc(l.description)}</Descripcion><Cantidad>${l.quantity}</Cantidad>` +
-      `<ValorUnitario>${l.unitValue}</ValorUnitario><Descuento>${l.quantity * l.unitValue - lineNet(l)}</Descuento>` +
-      `<Impuesto tipo="${l.taxKind}" tarifa="${l.taxRate}"/><Valor>${lineNet(l)}</Valor></Linea>`).join('\n');
-    return `<?xml version="1.0" encoding="UTF-8"?>
-<FacturaElectronica numero="${esc(inv.number)}" emision="${esc(inv.issuedAt)}" cufe="${esc(inv.cufe)}">
-  <Emisor nombre="${esc(this.config.get().issuer.name)}" nit="${esc(this.config.get().issuer.nit)}"/>
-  <Adquiriente tipoDoc="${inv.buyer.docType}" numero="${esc(inv.buyer.docNumber)}" dv="${esc(inv.buyer.dv)}" nombre="${esc(inv.buyer.name)}" correo="${esc(inv.buyer.email)}"/>
-  <Reserva codigo="${esc(inv.reservationCode)}"/>
-  <Lineas>
-${lines}
-  </Lineas>
-  <Totales subtotal="${t.subtotal}" descuentos="${t.discounts}" base="${t.base}" iva="${t.iva}" inc="${t.inc}" total="${t.total}"/>
-</FacturaElectronica>
-`;
+    try {
+      await this.svc.registerPayment(this.inv!.id, amount, f.method, f.receipt.trim());
+      this.payForm = undefined;
+    } catch (e) {
+      this.payError = serverMessage(e);
+    }
   }
 }

@@ -1,0 +1,41 @@
+/* Contabilidad: piezas propias (el resto viene de shared/styles/kit.css) */
+.acc-grid3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0 14px; }
+.acc-grid3 .wide { grid-column: 1 / -1; }
+.acc-readonly { background: #F4F7FB !important; color: #6B7280; }
+.acc-file { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 1px dashed #B8C4D4; border-radius: 8px; font-size: 13px; font-weight: 400; color: #374151; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.acc-file.invalid { border-color: #DC2626; background: #FFF8F8; color: #B91C1C; }
+.acc-file.ok { border-style: solid; }
+.acc-file input { display: none; }
+.acc-file svg { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: #DC2626; stroke-width: 2; }
+.acc-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; margin-top: 4px; border-top: 1px solid #EEF1F5; }
+.acc-foot .kit-actions .rsv-btn { height: 44px; }
+.acc-total-label { font-size: 13px; color: #374151; }
+.acc-total-label strong { font-size: 21px; color: #0A2540; margin-left: 6px; }
+.acc-entry td, .acc-entry th { padding: 9px 10px; }
+.acc-entry .acc-code { display: block; font-weight: 700; color: #0A2540; }
+.acc-entry small { color: #6B7280; font-size: 11px; }
+.acc-equal td { background: #ECFDF3; font-weight: 700; color: #0A2540; }
+.acc-unequal td { background: #FEF2F2; font-weight: 700; color: #B91C1C; }
+.acc-note { font-size: 11px; color: #6B7280; margin: 10px 0 0; }
+.acc-bar { margin-bottom: 11px; }
+.acc-bar div { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 5px; }
+.acc-bar i { display: block; height: 7px; border-radius: 999px; background: #E6EBF2; overflow: hidden; }
+.acc-bar b { display: block; height: 100%; border-radius: 999px; background: #1565C0; }
+.acc-bar--out b { background: #C26A0A; }
+.acc-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.acc-section-sub { font-size: 12.5px; font-weight: 500; color: #374151; margin: 0 0 8px; }
+.acc-origin { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; background: #E3EEFF; color: #1D4ED8; }
+.acc-origin--manual { background: #EEF1F5; color: #4B5563; }
+.acc-origin--migración { background: #F1E8FF; color: #7E22CE; }
+.acc-muted-row td { color: #9CA3AF; }
+.acc-red { color: #B91C1C; }
+.acc-green { color: #15803D; }
+.acc-sheet th { background: #F4F7FB; }
+.acc-sheet .acc-group td { background: #F4F7FB; font-weight: 700; color: #0A2540; font-size: 12px; }
+.acc-sheet .acc-subtotal td { font-weight: 700; color: #0A2540; }
+.acc-sheet .acc-grand td { background: #0A3D6D; color: #fff; font-weight: 700; font-size: 13.5px; }
+.acc-sheet .acc-grand td.r { border-left: 1px solid rgba(255,255,255,0.2); }
+.acc-sheet tr.clickable:hover td { background: #F2F7FD; }
+.acc-sheet tr.selected td { background: #EEF5FD; box-shadow: inset 0 0 0 1px #0B6FD0; }
+.acc-head-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.acc-head-row .kit-muted { font-size: 12px; }

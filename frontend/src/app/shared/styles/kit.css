@@ -1,0 +1,117 @@
+/* =====================================================
+   Kit de módulo: encabezado, tarjetas, filtros, tablas y totales
+   (Restaurante, Nómina · se usa junto con page-kit.css)
+   ===================================================== */
+
+/* ── Encabezado ───────────────────────────────────── */
+.kit-crumb { display: flex; gap: 6px; font-size: 12.5px; color: #6B7280; margin: 14px 0 4px; }
+.kit-crumb a { color: #0B6FD0; font-weight: 500; text-decoration: none; }
+.kit-crumb a:hover { text-decoration: underline; }
+
+.kit-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+.kit-title { margin: 0; font-size: 23px; font-weight: 700; color: #0A2540; }
+.kit-sub { margin: 4px 0 0; font-size: 13px; color: #6B7280; }
+.kit-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ── Tarjetas y maquetación ───────────────────────── */
+.kit-card { background: #fff; border: 1px solid #E6EBF2; border-radius: 14px; padding: 18px; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
+.kit-card-title { margin: 0 0 12px; font-size: 15px; font-weight: 700; color: #0A2540; }
+.kit-card-sub { margin: -8px 0 12px; font-size: 12px; color: #6B7280; }
+.kit-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start; }
+.kit-aside { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 110px; }
+.kit-stack { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+/* ── Buscador, selects y chips ────────────────────── */
+.kit-search { position: relative; flex: 1; min-width: 200px; }
+.kit-search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; stroke: #6B7280; fill: none; stroke-width: 2; stroke-linecap: round; }
+.kit-search input { width: 100%; height: 42px; padding: 0 12px 0 38px; border: 1px solid #D5DEEA; border-radius: 10px; font: inherit; font-size: 13px; outline: none; background: #fff; }
+.kit-search input:focus { border-color: #0B6FD0; box-shadow: 0 0 0 3px rgba(11,111,208,0.12); }
+
+.kit-select { display: flex; flex-direction: column; justify-content: center; min-width: 130px; height: 46px; padding: 0 12px; border: 1px solid #D5DEEA; border-radius: 10px; background: #fff; }
+.kit-select span { font-size: 10.5px; color: #6B7280; }
+.kit-select select, .kit-select input { border: none; outline: none; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: #0A2540; padding: 0; }
+
+.kit-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.kit-chip { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid #D5DEEA; background: #fff; font: inherit; font-size: 12.5px; font-weight: 500; color: #1F2937; cursor: pointer; }
+.kit-chip small { color: #6B7280; font-size: 11.5px; }
+.kit-chip:hover { border-color: #0B6FD0; }
+.kit-chip.active { background: #0A3D6D; border-color: #0A3D6D; color: #fff; }
+.kit-chip.active small { color: rgba(255,255,255,0.75); }
+
+/* ── Interruptor ──────────────────────────────────── */
+.kit-toggle { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.kit-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.kit-toggle i { position: absolute; inset: 0; border-radius: 999px; background: #CBD5E1; transition: background 0.15s; }
+.kit-toggle i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+.kit-toggle input:checked + i { background: #0B6FD0; }
+.kit-toggle input:checked + i::after { transform: translateX(16px); }
+.kit-toggle input:focus-visible + i { outline: 2px solid #0B6FD0; outline-offset: 2px; }
+.kit-toggle input:disabled + i { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Avisos ───────────────────────────────────────── */
+.kit-banner { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-radius: 12px; border: 1px solid; font-size: 13px; margin-bottom: 16px; }
+.kit-banner > svg { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.kit-banner div { flex: 1; min-width: 0; }
+.kit-banner strong { display: block; }
+.kit-banner--ok { background: #ECFDF3; border-color: #BBE7CB; color: #166534; }
+.kit-banner--warn { background: #FFF7ED; border-color: #FBD7A8; color: #92400E; }
+.kit-banner--danger { background: #FEF2F2; border-color: #FCA5A5; color: #B91C1C; }
+.kit-banner--info { background: #F4F7FB; border-color: #E6EBF2; color: #4B5563; }
+.kit-banner .rsv-btn { height: 34px; background: #fff; }
+/* El botón de peligro conserva su rojo dentro del aviso (con fondo blanco su texto blanco no se veía) */
+.kit-banner .rsv-btn--danger { background: #DC2626; }
+.kit-banner .rsv-btn--danger:hover { background: #B91C1C; }
+
+/* ── Indicadores ──────────────────────────────────── */
+.kit-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.kit-kpi { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid #E6EBF2; border-radius: 14px; padding: 16px; }
+.kit-kpi-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; }
+.kit-kpi-icon svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.kit-kpi-icon--blue { background: #1565C0; } .kit-kpi-icon--green { background: #2E9D5B; }
+.kit-kpi-icon--amber { background: #C26A0A; } .kit-kpi-icon--red { background: #C2331D; } .kit-kpi-icon--purple { background: #7C4DDB; }
+.kit-kpi span { display: block; font-size: 12.5px; color: #374151; }
+.kit-kpi strong { display: block; font-size: 21px; color: #0A2540; line-height: 1.3; }
+.kit-kpi small { font-size: 11px; color: #6B7280; }
+/* El círculo del ícono también es un <span>: no debe tomar el estilo de texto de arriba */
+.kit-kpi .kit-kpi-icon { display: flex; color: #fff; font-size: 0; }
+
+/* ── Tablas ───────────────────────────────────────── */
+.kit-table-wrap { overflow-x: auto; }
+.kit-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.kit-table th { background: #F4F7FB; color: #374151; font-weight: 600; text-align: left; padding: 10px 12px; white-space: nowrap; }
+.kit-table td { padding: 11px 12px; border-bottom: 1px solid #EEF1F5; vertical-align: middle; }
+.kit-table .r { text-align: right; }
+.kit-table tr.clickable { cursor: pointer; }
+.kit-table tr.clickable:hover td, .kit-table tr.selected td { background: #F2F7FD; }
+.kit-code { font-family: ui-monospace, 'Consolas', monospace; font-size: 12px; color: #0B6FD0; font-weight: 600; }
+.kit-mono { font-family: ui-monospace, 'Consolas', monospace; font-size: 11.5px; color: #4B5563; }
+.kit-muted { color: #6B7280; }
+.kit-empty { padding: 28px; text-align: center; color: #6B7280; font-size: 13px; }
+.kit-prod { display: flex; align-items: center; gap: 10px; }
+.kit-prod strong { font-size: 12.5px; color: #0A2540; }
+.kit-prod small { display: block; }
+
+/* ── Cantidad ─────────────────────────────────────── */
+.kit-qty { display: inline-flex; align-items: center; border: 1px solid #D5DEEA; border-radius: 8px; overflow: hidden; background: #fff; }
+.kit-qty button { width: 28px; height: 28px; border: none; background: #F4F7FB; color: #0B6FD0; font-size: 15px; font-weight: 700; cursor: pointer; }
+.kit-qty button:disabled { color: #CBD5E1; cursor: not-allowed; }
+.kit-qty span { min-width: 32px; text-align: center; font-weight: 700; font-size: 13px; }
+
+/* ── Totales ──────────────────────────────────────── */
+.kit-sum { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 7px 0; color: #374151; }
+.kit-sum strong { color: #0A2540; }
+.kit-sum--total { border-top: 1px solid #E6EBF2; margin-top: 6px; padding-top: 12px; }
+.kit-sum--total strong { font-size: 24px; }
+.kit-divider { border: none; border-top: 1px solid #EEF1F5; margin: 12px 0; }
+
+/* ── Campos ───────────────────────────────────────── */
+.kit-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 12.5px; font-weight: 500; color: #374151; }
+.kit-field .rsv-input.invalid { border-color: #DC2626; background: #FFF8F8; }
+.kit-error { font-size: 11.5px; color: #B91C1C; font-weight: 400; }
+.kit-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kit-block { width: 100%; }
+
+@media (max-width: 1100px) {
+  .kit-layout { grid-template-columns: 1fr; }
+  .kit-aside { position: static; }
+}

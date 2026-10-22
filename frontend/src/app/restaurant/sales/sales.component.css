@@ -1,0 +1,25 @@
+.sal-layout { grid-template-columns: minmax(0, 1fr) 320px; }
+.sal-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.sal-tabs button { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border: none; border-radius: 999px; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #1F2937; cursor: pointer; }
+.sal-tabs button span { min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #EEF1F5; font-size: 11px; display: inline-flex; align-items: center; justify-content: center; }
+.sal-tabs button.active { background: #0A3D6D; color: #fff; }
+.sal-tabs button.active span { background: #1F5A8E; color: #fff; }
+.sal-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.sal-filters .kit-search input { height: 46px; }
+.sal-date small, .sal-sub { display: block; color: #6B7280; font-size: 11px; }
+.sal-type { display: inline-block; padding: 3px 8px; border-radius: 6px; background: #DDF7E6; color: #15803D; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.sal-type.room { background: #F1E8FF; color: #7E22CE; }
+.sal-foot { margin: 12px 0 0; font-size: 12px; text-align: right; }
+
+.sal-detail-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.sal-detail-head span:first-child { display: block; font-size: 10.5px; text-transform: uppercase; color: #6B7280; }
+.sal-detail-head strong { font-family: ui-monospace, 'Consolas', monospace; font-size: 16px; color: #0A2540; }
+.sal-facts { margin: 0 0 12px; padding: 10px 12px; background: #F4F7FB; border-radius: 10px; font-size: 12px; }
+.sal-facts div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+.sal-facts dt { color: #6B7280; }
+.sal-facts dd { margin: 0; font-weight: 600; text-align: right; color: #0A2540; }
+.sal-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 12.5px; }
+.sal-item div { flex: 1; }
+.sal-item small { display: block; color: #6B7280; font-size: 11px; }
+.sal-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.sal-buttons .rsv-btn { height: 38px; padding: 0 10px; }

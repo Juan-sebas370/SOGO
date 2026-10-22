@@ -165,7 +165,6 @@ const ALL_ROOMS = ROOMS.map(r => r.number);
       <section class="tra-card">
         <div class="tra-card-head">
           <h2 class="tra-card-title">Catálogos</h2>
-          <button type="button" class="rsv-btn rsv-btn--outline rsv-btn--sm" (click)="svc.syncCatalogs()">Sincronizar</button>
         </div>
         <ul class="tc-catalogs">
           <li *ngFor="let c of catalogs">
@@ -173,7 +172,7 @@ const ALL_ROOMS = ROOMS.map(r => r.number);
             <span class="rsv-badge" [ngClass]="c.provisional ? 'rsv-badge--warn' : 'rsv-badge--ok'">{{ c.provisional ? 'Provisional' : 'Cargado' }}</span>
           </li>
         </ul>
-        <p class="tc-small">Última sincronización: {{ dateTime(svc.catalogsSynced) }}. Validar todos los códigos contra el manual técnico PMS vigente antes de producción.</p>
+        <p class="tc-small">Los catálogos vienen incluidos en SOGO (no se descargan del MinCIT). Valida sus códigos contra el manual técnico PMS vigente antes de activar el envío automático.</p>
       </section>
 
       <section class="tra-card">
@@ -292,7 +291,7 @@ export class TraConfigComponent {
     this.form = { ...this.form, lastSync: this.current.lastSync, integrationActive: this.current.integrationActive };
     this.test = res.httpStatus === 200
       ? { state: 'ok', message: `Conexión exitosa con MinCIT · HTTP 200 · ${res.durationMs} ms` }
-      : { state: 'error', message: `MinCIT respondió HTTP ${res.httpStatus}. Revisa el token en el servidor.` };
+      : { state: 'error', message: res.httpStatus ? `MinCIT respondió HTTP ${res.httpStatus}. Revisa el token en el servidor.` : res.message };
   }
 
   openUnit(u?: LodgingUnit): void {

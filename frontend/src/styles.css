@@ -828,3 +828,13 @@ button.primary svg {
   .topbar, .dashboard-sidebar, .section-card, .stat-card { padding: 18px; }
   .stats-grid { grid-template-columns: 1fr; }
 }
+
+/* =====================================================
+   IMPRESIÓN — solo el contenido de la página, sin el menú del dashboard
+   ===================================================== */
+@media print {
+  .dash-sidebar, .dash-topbar, .no-print { display: none !important; }
+  .dash-page { display: block !important; }
+  .dash-content { padding: 0 !important; }
+  body { background: #fff !important; }
+}

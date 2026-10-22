@@ -1,0 +1,46 @@
+.cp-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 18px; align-items: start; }
+.cp-list { display: flex; flex-direction: column; gap: 6px; padding: 14px; }
+.cp-list .rsv-input { margin-bottom: 6px; }
+.cp-item { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid transparent; border-radius: 10px; background: none; font: inherit; text-align: left; cursor: pointer; }
+.cp-item:hover { background: #F4F7FB; }
+.cp-item.active { border-color: #0B6FD0; background: #F5F9FE; }
+.cp-item-name { flex: 1; min-width: 0; }
+.cp-item-name strong { display: block; font-size: 12.5px; color: #0A2540; }
+.cp-item-net { font-size: 12.5px; font-weight: 700; color: #0A2540; white-space: nowrap; }
+.cp-item-net em { font-style: normal; color: #16A34A; margin-left: 4px; }
+.cp-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.cp-toolbar .rsv-btn { height: 36px; padding: 0 14px; }
+.cp-sheet { padding: 30px; }
+.cp-top { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 20px; }
+.cp-issuer { display: flex; gap: 14px; }
+.cp-logo { width: 64px; height: 64px; object-fit: contain; flex-shrink: 0; }
+.cp-issuer h2 { margin: 0 0 4px; font-size: 16px; color: #0A2540; }
+.cp-issuer p, .cp-num p { margin: 0; font-size: 12px; color: #6B7280; }
+.cp-num { text-align: right; }
+.cp-num span { font-size: 10.5px; font-weight: 700; color: #0B6FD0; text-transform: uppercase; }
+.cp-num strong { display: block; font-size: 21px; font-family: ui-monospace, 'Consolas', monospace; color: #0A2540; }
+.cp-boxes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.cp-boxes div { padding: 12px; border: 1px solid #E6EBF2; border-radius: 10px; font-size: 12px; color: #4B5563; }
+.cp-boxes span { display: block; font-size: 10.5px; font-weight: 700; color: #0B6FD0; text-transform: uppercase; margin-bottom: 4px; }
+.cp-boxes strong { display: block; font-size: 13px; color: #0A2540; }
+.cp-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cp-tables .kit-table th { background: #0A3D6D; color: #fff; }
+.cp-total td { background: #EEF5FD; font-weight: 700; color: #0A2540; }
+.cp-total--red td { background: #FEF2F2; }
+.cp-bottom { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; margin-top: 18px; }
+.cp-bottom .pay-footnote p { margin: 3px 0; }
+.cp-net { display: flex; align-items: center; gap: 22px; padding: 16px 22px; border-radius: 10px; background: #0A3D6D; color: #fff; }
+.cp-net span { font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.cp-net strong { font-size: 22px; }
+.cp-signs { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; }
+.cp-signs > span { padding-top: 8px; border-top: 1px solid #94A3B8; font-size: 11.5px; color: #6B7280; align-self: end; }
+@media (max-width: 1100px) { .cp-layout, .cp-tables, .cp-boxes { grid-template-columns: 1fr; } }
+.cp-received { display: flex; flex-direction: column; gap: 4px; }
+.cp-received img { max-height: 70px; max-width: 220px; object-fit: contain; align-self: flex-start; }
+.cp-receipt { margin-top: 18px; display: grid; gap: 12px; }
+.cp-receipt .kit-card-title { margin: 0; }
+.cp-receipt .pay-hint { margin: 0; }
+.cp-check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: #0A2540; }
+.cp-receipt .rsv-btn { justify-self: start; }
+.cp-signs > span.cp-received { border-top: none; padding-top: 0; }
+.cp-sigline { padding-top: 8px; border-top: 1px solid #94A3B8; }

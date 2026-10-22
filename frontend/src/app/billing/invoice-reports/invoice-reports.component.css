@@ -1,15 +1,120 @@
-@import url('../../shared/styles/report-page.css');
+@import url('../billing.css');
 
-.chart-card--wide { grid-column: 1 / 2; }
+/* =====================================================
+   FACTURACIÓN — reportes
+   ===================================================== */
 
-.bar-chart--tall { height: 140px; }
+.rep-red { stroke: #DC2626 !important; }
+.rep-green { stroke: #15803D !important; }
 
-.report-stat-card--highlight {
-  background: linear-gradient(135deg, #EEF4FB, #D8E8F5);
-  border-color: #C8DCF0;
+.rep-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+  padding: 12px;
+  margin-bottom: 10px;
 }
 
-.stat-value--income {
-  font-size: 22px;
-  color: #0A3D6D;
+.rep-range {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 12px;
+  border: 1px solid #D5DEEA;
+  border-radius: 8px;
+}
+
+.rep-range > div { display: flex; align-items: center; gap: 6px; }
+
+:host .rep-range .rsv-input {
+  width: 138px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.rep-filters .bil-select { flex: 1 1 170px; }
+.rep-generate { height: 46px; margin-left: auto; }
+.rep-dirty { margin: 0 0 10px; font-size: 12px; color: #B45309; }
+.rep-print-range { display: none; }
+
+.rep-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 6px 0 16px;
+}
+
+.rep-kpis .bil-card { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.rep-kpis span { font-size: 12.5px; font-weight: 500; color: #1F2937; }
+.rep-kpis strong { font-size: 24px; font-weight: 700; color: #0A2540; }
+.rep-kpis small { font-size: 11px; color: #6B7280; }
+
+.rep-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.rep-charts .bil-card + .bil-card { margin-top: 0; }
+.rep-sm { height: 32px; padding: 0 12px; font-size: 12px; }
+
+.rep-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 190px;
+  padding: 8px 4px 0;
+  border-bottom: 1px solid #D5DEEA;
+  background: repeating-linear-gradient(to top, transparent 0, transparent 37px, #EEF1F5 37px, #EEF1F5 38px);
+}
+
+.rep-bar {
+  flex: 1;
+  min-width: 6px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+}
+
+.rep-bar span { width: 70%; max-width: 26px; border-radius: 4px 4px 0 0; background: #1D6FE0; }
+.rep-bar small { font-size: 9.5px; color: #6B7280; transform: translateY(18px); }
+
+.rep-services { list-style: none; margin: 14px 0; padding: 0; }
+.rep-services li { margin-bottom: 14px; }
+.rep-services li > div { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; font-size: 12.5px; color: #1F2937; }
+.rep-services strong { color: #0A2540; }
+.rep-track { display: block; height: 8px; border-radius: 999px; background: #EEF1F5; overflow: hidden; }
+.rep-track span { display: block; height: 100%; border-radius: 999px; background: #1D6FE0; }
+.rep-muted { font-size: 12.5px; color: #6B7280; }
+
+.rep-detail { padding-bottom: 8px; }
+.rep-detail .bil-card-head { align-items: center; }
+.rep-annulled td { color: #9CA3AF !important; text-decoration: line-through; }
+.rep-annulled .rsv-badge { text-decoration: none; }
+
+.rep-detail tfoot td {
+  padding: 12px;
+  background: #F2F7FE;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0A2540;
+}
+
+@media (max-width: 1100px) {
+  .rep-kpis { grid-template-columns: 1fr 1fr; }
+  .rep-charts { grid-template-columns: 1fr; }
+}
+
+@media print {
+  .rep-print-range { display: block; margin: 0 0 10px; font-size: 12px; color: #374151; }
+  .rep-bar span, .rep-track span { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }

@@ -2,7 +2,7 @@
    TRA — base común del módulo. Se usa junto con el
    sistema rsv-* de Reservas (botones, badges, panel,
    modal, campos), que cada pantalla importa antes:
-     @import url('../../reservations/reservations.css');
+     @import url('../../shared/styles/page-kit.css');
    ===================================================== */
 
 @import url('./tra-base.css');

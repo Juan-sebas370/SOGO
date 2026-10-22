@@ -1,89 +1,287 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Invoice, InvoiceStatus } from './invoice.model';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, firstValueFrom } from 'rxjs';
+import {
+  Invoice, InvoiceLine, InvoiceState, Buyer, BuyerDocType, invoiceTotal, isValidInvoice,
+} from './invoice.model';
+import { BillingConfigService } from './billing-config.service';
+import { ChargeService } from './charge.service';
+import { ReservationService } from '../reservations/reservation.service';
+import { UsersService } from '../users/users.service';
+import { Reservation, PaymentMethod, lodgingLabel, paidAmount, isInHouse } from '../reservations/reservation.model';
+import { isoDate } from '../shared/date-utils';
+import { API_URL } from '../api';
 
-const EVENTS_GEN = [
-  { label: 'Factura generada',              date: '24/05/2024 10:32 a.m.' },
-  { label: 'Factura firmada electrónicamente', date: '24/05/2024 10:32 a.m.' },
-  { label: 'Factura enviada a la DIAN',      date: '24/05/2024 10:32 a.m.' },
-  { label: 'Aceptada por la DIAN',           date: '24/05/2024 10:32 a.m.' },
-  { label: 'Correo enviado al cliente',      date: '24/05/2024 10:33 a.m.' },
-];
+const DOC_TYPE_CODE: Record<string, BuyerDocType> = {
+  'Cédula de Ciudadanía': 'CC', 'Cédula de Extranjería': 'CE', 'Pasaporte': 'PA', 'Tarjeta de Identidad': 'TI', 'NIT': 'NIT',
+};
 
+/** "22–25/09" a partir de dos fechas YYYY-MM-DD. */
+function rangeLabel(from: string, to: string): string {
+  const [, fm, fd] = from.split('-');
+  const [, tm, td] = to.split('-');
+  if (from === to) return `${fd}/${fm}`;
+  return fm === tm ? `${fd}–${td}/${tm}` : `${fd}/${fm}–${td}/${tm}`;
+}
+
+/** Lo que el servidor recibe de una factura (los eventos, números y estados los pone él). */
+const body = (inv: Invoice) => ({
+  id: inv.id, reservationId: inv.reservationId, billTo: inv.billTo, buyer: inv.buyer, lines: inv.lines,
+  paymentTerm: inv.paymentTerm, dueDate: inv.dueDate, fiscalValidatedAt: inv.fiscalValidatedAt,
+});
+
+/**
+ * Facturas electrónicas guardadas en la base de datos (tablas `facturas`, `factura_lineas`,
+ * `factura_eventos`). El servidor numera con la resolución, guarda el historial y valida.
+ * La validación ante la DIAN la hace el proveedor tecnológico: SOGO registra su respuesta
+ * (CUFE o motivo de rechazo); no la inventa.
+ */
 @Injectable({ providedIn: 'root' })
 export class InvoiceService {
 
-  private data: Invoice[] = [
-    { id:'1', number:'FE-000162', clientName:'María López',    docType:'Cédula de Ciudadanía', docNumber:'1234567890', email:'maria.lopez@email.com', phone:'300 123-4567', issueDate:'2024-05-24', dueDate:'2024-05-24', paymentMethod:'Tarjeta de Crédito', concepts:[{description:'Alojamiento',quantity:4,unitValue:150000,total:600000},{description:'Desayuno',quantity:4,unitValue:20000,total:80000}], subtotal:680000, iva:129200, total:809200, observations:'Servicio de alojamiento del 20/05/2024 al 24/05/2024.', status:'Pagada',    cufe:'9f7c2ef56abc1c3a7e0b74efa9f7c2ef56', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', sentAt:'2024-05-24T10:33', events:[...EVENTS_GEN] },
-    { id:'2', number:'FE-000161', clientName:'Juan Pérez',     docType:'Cédula de Ciudadanía', docNumber:'9876543210', email:'juan.perez@email.com',   phone:'310 234-5678', issueDate:'2024-05-24', dueDate:'2024-05-26', paymentMethod:'Efectivo',           concepts:[{description:'Alojamiento',quantity:1,unitValue:280000,total:280000}],                                                                                subtotal:280000, iva:53200,  total:333200, observations:'', status:'Pagada',    cufe:'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', sentAt:'2024-05-24T11:10', events:[...EVENTS_GEN] },
-    { id:'3', number:'FE-000160', clientName:'Ana Gómez',      docType:'Cédula de Ciudadanía', docNumber:'1122334455', email:'ana.gomez@email.com',    phone:'320 345-6789', issueDate:'2024-05-25', dueDate:'2024-05-28', paymentMethod:'Transferencia',      concepts:[{description:'Alojamiento',quantity:2,unitValue:160000,total:320000},{description:'Desayuno',quantity:2,unitValue:18000,total:36000}],      subtotal:356000, iva:67640,  total:423640, observations:'', status:'Pendiente', cufe:'', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', events:[] },
-    { id:'4', number:'FE-000159', clientName:'Carlos Ruiz',    docType:'Pasaporte',            docNumber:'AB123456',   email:'carlos.ruiz@email.com',  phone:'350 456-7890', issueDate:'2024-05-26', dueDate:'2024-05-28', paymentMethod:'Tarjeta de Débito',  concepts:[{description:'Alojamiento',quantity:2,unitValue:340000,total:680000}],                                                                                subtotal:680000, iva:129200, total:809200, observations:'', status:'Pagada',    cufe:'f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', sentAt:'2024-05-26T13:30', events:[...EVENTS_GEN] },
-    { id:'5', number:'FE-000158', clientName:'Luisa Martínez', docType:'Cédula de Ciudadanía', docNumber:'5566778899', email:'luisa.m@email.com',       phone:'315 567-8901', issueDate:'2024-05-27', dueDate:'2024-05-29', paymentMethod:'Efectivo',           concepts:[{description:'Alojamiento',quantity:2,unitValue:160000,total:320000}],                                                                                subtotal:320000, iva:60800,  total:380800, observations:'', status:'Pendiente', cufe:'', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', events:[] },
-    { id:'6', number:'FE-000157', clientName:'Pedro Ramírez',  docType:'Cédula de Ciudadanía', docNumber:'6677889900', email:'pedro.r@email.com',       phone:'312 678-9012', issueDate:'2024-05-22', dueDate:'2024-05-22', paymentMethod:'Tarjeta de Crédito', concepts:[{description:'Alojamiento',quantity:1,unitValue:280000,total:280000}],                                                                                subtotal:280000, iva:53200,  total:333200, observations:'', status:'Rechazada', cufe:'', techProvider:'Factuatech S.A.S.', dianResolution:'18764321246676 de 09/21/2024', events:[] },
-  ];
+  private readonly base = `${API_URL}/facturacion/facturas`;
+  private data: Invoice[] = [];
+  private invoices$ = new BehaviorSubject<Invoice[]>([]);
+  private loading?: Promise<void>;
+  private loadedFor = '';
 
-  private invoices$ = new BehaviorSubject<Invoice[]>(this.data);
+  constructor(
+    private http: HttpClient,
+    private reservations: ReservationService,
+    private charges: ChargeService,
+    private config: BillingConfigService,
+    private users: UsersService,
+  ) {
+    // El estado de pago depende de los pagos de la reserva: si cambian, se vuelve a emitir la lista
+    this.reservations.getAll().subscribe(() => this.invoices$.next(this.data));
+  }
 
-  getAll():    Observable<Invoice[]> { return this.invoices$.asObservable(); }
+  /** Primera carga de la sesión (el guard del dashboard la espera). Sin permiso de consulta queda vacío. */
+  ready(): Promise<void> {
+    const token = localStorage.getItem('sogo_token') || '';
+    if (!this.loading || token !== this.loadedFor) {
+      this.loadedFor = token;
+      this.loading = token ? this.reload().catch(e => { if (e?.status !== 403) console.error('No se pudieron cargar las facturas', e); }) : Promise.resolve();
+    }
+    return this.loading;
+  }
+
+  async reload(): Promise<void> {
+    this.data = await firstValueFrom(this.http.get<Invoice[]>(this.base));
+    this.invoices$.next(this.data);
+  }
+
+  getAll(): Observable<Invoice[]> { return this.invoices$.asObservable(); }
+  getSnapshot(): Invoice[] { return this.data; }
   getById(id: string): Invoice | undefined { return this.data.find(i => i.id === id); }
 
-  create(inv: Omit<Invoice,'id'|'number'|'cufe'|'events'|'sentAt'>): Invoice {
-    const n = this.data.length + 157;
-    const newInv: Invoice = {
-      ...inv,
-      id: String(Date.now()),
-      number: `FE-${String(n).padStart(6,'0')}`,
-      cufe: Math.random().toString(36).substring(2, 38),
-      events: [
-        { label:'Factura generada',              date: new Date().toLocaleString() },
-        { label:'Factura firmada electrónicamente', date: new Date().toLocaleString() },
-        { label:'Factura enviada a la DIAN',      date: new Date().toLocaleString() },
-        { label:'Aceptada por la DIAN',           date: new Date().toLocaleString() },
-      ]
+  // ── Borrador a partir de una reserva ─────────────────
+
+  /** Adquiriente precargado: los datos de la última factura del mismo documento, o los del huésped. */
+  buyerFor(r: Reservation): Buyer {
+    const previous = this.data.find(i => i.billTo === 'Huésped' && i.buyer.docNumber === r.docNumber);
+    if (previous) return { ...previous.buyer };
+    const [country, rest = ''] = r.city.split(' - ');
+    const [city = '', department = ''] = rest.split(',').map(s => s.trim());
+    return {
+      personType: 'Natural', docType: DOC_TYPE_CODE[r.docType] ?? 'CC', docNumber: r.docNumber, dv: '',
+      name: r.guestName, fiscalResponsibility: 'R-99-PN · No aplica – Otros',
+      email: r.email, phone: r.phone, country: country || 'Colombia', department, city, address: '',
     };
-    this.data = [newInv, ...this.data];
-    this.invoices$.next(this.data);
-    return newInv;
   }
 
-  update(id: string, changes: Partial<Invoice>): void {
-    this.data = this.data.map(i => i.id === id ? { ...i, ...changes } : i);
-    this.invoices$.next(this.data);
+  emptyCompanyBuyer(): Buyer {
+    return {
+      personType: 'Jurídica', docType: 'NIT', docNumber: '', dv: '', name: '', fiscalResponsibility: 'R-99-PN · No aplica – Otros',
+      email: '', phone: '', country: 'Colombia', department: '', city: '', address: '',
+    };
   }
 
-  send(id: string, email: string): void {
-    this.update(id, {
-      sentAt: new Date().toISOString(),
-      status: 'Pagada',
-      events: [
-        ...(this.getById(id)?.events ?? []),
-        { label: 'Correo enviado al cliente', date: new Date().toLocaleString() }
-      ]
+  /** Líneas facturables: el alojamiento de la reserva + los consumos cargados a la estadía y aún sin facturar. */
+  buildLines(r: Reservation): InvoiceLine[] {
+    const foreign = r.docType === 'Pasaporte' && !r.city.startsWith('Colombia');
+    const isDayPass = r.nights === 0;
+    const lodgingCategory = isDayPass ? 'Eventos y pasadías' : 'Alojamiento';
+    const lodgingTax = this.config.taxFor(lodgingCategory, foreign);
+    const lodging: InvoiceLine = {
+      id: `l-${r.id}`, category: lodgingCategory,
+      description: `${isDayPass ? 'Evento / pasadía' : 'Alojamiento'} · ${lodgingLabel(r)}`,
+      detail: `Reserva ${r.code}`, dateLabel: rangeLabel(r.checkIn, r.checkOut),
+      quantity: isDayPass ? 1 : r.nights, unitLabel: isDayPass ? 'día' : 'noches',
+      unitValue: Math.round(r.lodgingAmount / (isDayPass ? 1 : r.nights)),
+      discountPct: 0, discountLabel: '', taxKind: lodgingTax.kind, taxRate: lodgingTax.rate, included: true,
+    };
+    const consumos = this.charges.forReservation(r.id).filter(c => !this.invoiceForCharge(c.id)).map<InvoiceLine>(c => {
+      const tax = this.config.taxFor(c.category);
+      return {
+        id: `c-${c.id}`, category: c.category, description: c.description, detail: c.detail,
+        dateLabel: rangeLabel(c.date, c.date), quantity: c.quantity, unitLabel: '', unitValue: c.unitValue,
+        discountPct: 0, discountLabel: '', taxKind: tax.kind, taxRate: tax.rate, included: true, chargeId: c.id,
+      };
     });
+    return [lodging, ...consumos];
   }
 
-  annul(id: string): void { this.update(id, { status: 'Anulada' }); }
+  newDraft(r: Reservation, billTo: Invoice['billTo'] = 'Huésped'): Invoice {
+    return {
+      id: '', number: '', reservationId: r.id, reservationCode: r.code, billTo,
+      buyer: billTo === 'Empresa' ? this.emptyCompanyBuyer() : this.buyerFor(r),
+      lines: this.buildLines(r), paymentTerm: 'Contado', dueDate: isoDate(0),
+      dianStatus: 'Borrador', events: [],
+    };
+  }
 
+  async saveDraft(inv: Invoice): Promise<Invoice> {
+    const saved = await firstValueFrom(this.http.post<Invoice>(this.base, body(inv)));
+    this.upsert(saved);
+    this.users.addLog('Factura en borrador', `${inv.reservationCode} · ${inv.buyer.name}`);
+    return saved;
+  }
+
+  async deleteDraft(id: string): Promise<void> {
+    await firstValueFrom(this.http.delete(`${this.base}/${id}`));
+    this.data = this.data.filter(i => i.id !== id);
+    this.invoices$.next(this.data);
+  }
+
+  // ── Numeración (vista previa; el número definitivo lo asigna el servidor al emitir) ──
+
+  private lastNumber(): number {
+    const { prefix, from } = this.config.get().resolution;
+    const used = this.data.map(i => i.number).filter(n => n.startsWith(prefix + '-')).map(n => Number(n.split('-')[1]) || 0);
+    return Math.max(from - 1, ...used);
+  }
+
+  nextNumber(): string { return `${this.config.get().resolution.prefix}-${this.lastNumber() + 1}`; }
+
+  rangeUsage(): { used: number; left: number } {
+    const { from, to } = this.config.get().resolution;
+    const used = Math.max(0, this.lastNumber() - from + 1);
+    return { used, left: Math.max(0, to - from + 1 - used) };
+  }
+
+  /** Factura válida de la estadía que incluye un consumo dado. */
+  invoiceForCharge(chargeId: string): Invoice | undefined {
+    return this.data.find(i => isValidInvoice(i) && i.lines.some(l => l.included && l.chargeId === chargeId));
+  }
+
+  // ── Emisión y respuesta de la DIAN ───────────────────
+
+  /** El servidor valida, asigna el número de la resolución y la deja pendiente de validación DIAN. */
+  async issue(draft: Invoice): Promise<Invoice> {
+    const inv = await firstValueFrom(this.http.post<Invoice>(`${this.base}/${draft.id || 0}/emitir`, body(draft)));
+    this.upsert(inv);
+    this.users.addLog('Emisión de factura', `${inv.number} · ${inv.reservationCode} · ${inv.buyer.name}`);
+    return inv;
+  }
+
+  /** Respuesta de la DIAN informada por el proveedor: aceptada (CUFE) o rechazada (motivo). */
+  async registerDianResponse(id: string, r: { accepted: true; cufe: string } | { accepted: false; reason: string }): Promise<void> {
+    const inv = await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/respuesta-dian`, r));
+    this.upsert(inv);
+    this.users.addLog(r.accepted ? 'Factura aceptada por la DIAN' : 'Factura rechazada por la DIAN', `${inv.number}${r.accepted ? '' : ' · ' + r.reason}`);
+  }
+
+  /** Corrige el adquiriente de una factura rechazada y la deja otra vez en validación (conserva su número). */
+  async resend(id: string, buyer: Buyer): Promise<void> {
+    this.upsert(await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/corregir`, { buyer })));
+  }
+
+  // ── Después de emitir ────────────────────────────────
+
+  /** Envía la factura por correo desde el servidor (cuenta de correo de SOGO). */
+  async sendEmail(id: string, mail: { to: string; cc: string; subject: string; body: string }): Promise<void> {
+    this.upsert(await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/correo`, mail)));
+  }
+
+  /** Deja constancia de un envío hecho fuera de SOGO (WhatsApp). */
+  async logSent(id: string, channel: 'Correo' | 'WhatsApp', to: string): Promise<void> {
+    this.upsert(await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/envio`, { channel, to })));
+  }
+
+  logDownload(id: string, what: 'PDF' | 'XML'): void {
+    firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/descarga`, { what })).then(inv => this.upsert(inv)).catch(() => undefined);
+  }
+
+  async annul(id: string, reason: string): Promise<void> {
+    const inv = await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/anular`, { reason }));
+    this.upsert(inv);
+    this.users.addLog('Anulación de factura', `${inv.number} · nota crédito ${inv.annulment?.creditNote} · ${reason}`);
+  }
+
+  /** Registra un pago de la factura en la cuenta de la reserva (única fuente de los pagos). */
+  async registerPayment(id: string, amount: number, method: PaymentMethod, receipt: string): Promise<void> {
+    const inv = this.getById(id);
+    if (!inv) return;
+    this.reservations.addPayment(inv.reservationId, { amount, method, receipt });
+    const detail = `${method} · ${new Intl.NumberFormat('es-CO').format(amount)}${receipt ? ' · ' + receipt : ''}`;
+    this.upsert(await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/pago`, { detail })));
+  }
+
+  // ── Estado derivado ──────────────────────────────────
+
+  total(inv: Invoice): number { return invoiceTotal(inv); }
+
+  /** Lo pagado: los pagos de la reserva, hasta el total de la factura. */
+  paid(inv: Invoice): number {
+    const r = this.reservations.getById(inv.reservationId);
+    return r ? Math.min(this.total(inv), paidAmount(r)) : 0;
+  }
+
+  balance(inv: Invoice): number { return Math.max(0, this.total(inv) - this.paid(inv)); }
+
+  /** Método del último pago recibido en la reserva de la factura. */
+  lastPaymentMethod(inv: Invoice): PaymentMethod | undefined {
+    return this.reservations.getById(inv.reservationId)?.payments.slice(-1)[0]?.method;
+  }
+
+  state(inv: Invoice): InvoiceState {
+    if (inv.dianStatus === 'Borrador') return 'Borrador';
+    if (inv.annulment) return 'Anulada';
+    if (inv.dianStatus === 'En validación') return 'Emitida';
+    if (this.balance(inv) === 0) return 'Pagada';
+    // Rechazada por la DIAN: aún no es válida, así que no "vence"; queda pendiente de corrección
+    if (inv.dianStatus === 'Rechazada') return 'Pendiente';
+    return inv.dueDate < isoDate(0) ? 'Vencida' : 'Pendiente';
+  }
+
+  /** Estadías cerradas (o que salen hoy) que todavía no tienen una factura válida. */
+  pendingCheckouts(): Reservation[] {
+    const today = isoDate(0);
+    const invoiced = new Set(this.data.filter(isValidInvoice).map(i => i.reservationId));
+    return this.reservations.getSnapshot().filter(r =>
+      !invoiced.has(r.id) && (r.status === 'Finalizada' || (isInHouse(r) && r.checkOut <= today)));
+  }
+
+  /** Resumen para Inicio y notificaciones. */
   getStats() {
-    const total   = this.data.length;
-    const paid    = this.data.filter(i => i.status === 'Pagada').length;
-    const pending = this.data.filter(i => i.status === 'Pendiente').length;
-    const annulled= this.data.filter(i => i.status === 'Anulada').length;
-    const rejected= this.data.filter(i => i.status === 'Rechazada').length;
-    const income  = this.data.filter(i => i.status === 'Pagada').reduce((a,i) => a + i.total, 0);
-    const pendingAmount = this.data.filter(i => i.status === 'Pendiente').reduce((a,i) => a + i.total, 0);
-    return { total, paid, pending, annulled, rejected, income, pendingAmount };
+    const valid = this.data.filter(isValidInvoice);
+    const states = valid.map(i => this.state(i));
+    return {
+      total: valid.length,
+      paid: states.filter(s => s === 'Pagada').length,
+      pending: states.filter(s => s !== 'Pagada').length,
+      annulled: this.data.filter(i => i.annulment).length,
+      rejected: valid.filter(i => i.dianStatus === 'Rechazada').length,
+      income: valid.reduce((s, i) => s + this.paid(i), 0),
+      pendingAmount: valid.reduce((s, i) => s + this.balance(i), 0),
+    };
   }
 
-  // Ingresos agrupados por fecha real de emisión (no es una serie de "últimos N días":
-  // son las fechas que efectivamente existen en los datos), para un gráfico honesto.
+  /** Total facturado (válidas) por fecha de emisión. */
   getIncomeByDate(): { date: string; amount: number }[] {
     const byDate = new Map<string, number>();
-    this.data.filter(i => i.status === 'Pagada').forEach(i => {
-      byDate.set(i.issueDate, (byDate.get(i.issueDate) ?? 0) + i.total);
+    this.data.filter(isValidInvoice).forEach(i => {
+      const d = i.issuedAt!.slice(0, 10);
+      byDate.set(d, (byDate.get(d) ?? 0) + this.total(i));
     });
-    return [...byDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({ date, amount }));
+    return [...byDate].sort(([a], [b]) => a.localeCompare(b)).map(([date, amount]) => ({ date, amount }));
+  }
+
+  // ── Interno ──────────────────────────────────────────
+
+  private upsert(inv: Invoice): void {
+    this.data = this.data.some(i => i.id === inv.id) ? this.data.map(i => i.id === inv.id ? inv : i) : [inv, ...this.data];
+    this.invoices$.next(this.data);
   }
 }

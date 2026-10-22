@@ -1,0 +1,98 @@
+/* Reportes y estadísticas — complementa page-kit.css y kit.css */
+
+.rp-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.rp-filters .kit-select { flex: 1; min-width: 140px; }
+.rp-filters .rsv-btn { height: 46px; padding: 0 22px; }
+.rp-filters-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; width: 100%; }
+.rp-filters-row > span { font-size: 12.5px; color: #6B7280; }
+
+.rp-kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.rp-kpi { display: block; background: #fff; border: 1px solid #E6EBF2; border-radius: 14px; padding: 15px 16px; }
+.rp-kpi > span { display: block; font-size: 12.5px; color: #374151; font-weight: 500; }
+.rp-kpi > strong { display: block; font-size: 22px; color: #0A2540; line-height: 1.35; margin: 2px 0 3px; }
+.rp-kpi > small, .rp-kpi .rp-cmp { font-size: 11px; color: #6B7280; }
+.rp-kpi--alert { border-color: #F3C6C1; }
+.rp-kpi--alert > strong { color: #B42318; }
+
+.rp-delta { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; font-size: 11px; margin-right: 6px; white-space: nowrap; }
+.rp-delta svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.rp-delta.good { color: #1F8A5B; }
+.rp-delta.bad { color: #C62828; }
+.rp-delta.none { color: #9AA5B4; font-weight: 500; }
+
+.rp-grid { display: grid; gap: 18px; margin-bottom: 18px; align-items: stretch; }
+.rp-grid--2-1 { grid-template-columns: minmax(0, 1.75fr) minmax(290px, 1fr); }
+.rp-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rp-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rp-grid--1-2 { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+
+.rp-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.rp-card-head .kit-card-title { margin-bottom: 2px; }
+.rp-card-head .kit-card-sub { margin: 0; }
+.rp-note { margin: 10px 0 0; font-size: 12px; color: #4B5563; line-height: 1.5; }
+.rp-muted { color: #6B7280; font-size: 12px; }
+
+.rp-legend { display: flex; gap: 14px; font-size: 12px; color: #374151; flex-wrap: wrap; }
+.rp-legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.rp-legend i.line { height: 3px; border-radius: 2px; width: 14px; vertical-align: 3px; }
+
+/* Barras horizontales (fuentes, categorías) */
+.rp-hbar { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(70px, 1.1fr) auto; align-items: center; gap: 12px; padding: 7px 0; font-size: 12.5px; color: #1F2937; }
+.rp-hbar-track { height: 10px; border-radius: 999px; background: #EEF2F7; overflow: hidden; }
+.rp-hbar-track b { display: block; height: 100%; border-radius: 999px; min-width: 3px; }
+.rp-hbar strong { font-size: 12.5px; color: #0A2540; text-align: right; white-space: nowrap; }
+
+/* Leyenda de anillo */
+.rp-donut-wrap { max-width: 210px; margin: 0 auto 8px; }
+.rp-donut-legend { display: grid; grid-template-columns: auto 1fr auto auto; gap: 7px 12px; align-items: center; font-size: 12.5px; }
+.rp-donut-legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.rp-donut-legend strong { text-align: right; color: #0A2540; }
+.rp-donut-legend small { text-align: right; color: #6B7280; font-size: 11.5px; }
+
+/* Tablas */
+.rp-table td.r, .rp-table th.r { text-align: right; }
+.rp-table tr.rp-total td { background: #EEF5FD; font-weight: 700; color: #0A2540; }
+.rp-table tr.rp-void td { color: #9AA5B4; }
+.rp-table tr.rp-void td .rp-strike { text-decoration: line-through; }
+.rp-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; font-weight: 700; color: #0B6FD0; text-decoration: none; }
+a.rp-code:hover { text-decoration: underline; }
+.rp-pos { color: #1F8A5B; font-weight: 700; }
+.rp-neg { color: #C62828; font-weight: 700; }
+.rp-warn { color: #B45309; font-weight: 700; }
+
+.rp-meter { display: flex; align-items: center; gap: 10px; }
+.rp-meter-track { flex: 1; min-width: 60px; height: 8px; border-radius: 999px; background: #EEF2F7; overflow: hidden; }
+.rp-meter-track b { display: block; height: 100%; border-radius: 999px; background: #1565C0; }
+.rp-meter-track b.low { background: #D98A0B; }
+
+.rp-module { display: inline-block; padding: 4px 9px; border-radius: 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.rp-module--reservas { background: #E3EEFB; color: #1565C0; }
+.rp-module--alojamiento { background: #E2F5EC; color: #1F7A52; }
+.rp-module--tra { background: #EFE7FC; color: #6D3FC8; }
+.rp-module--facturacion { background: #FDF3D7; color: #92600A; }
+.rp-module--restaurante { background: #FDEBD8; color: #B45309; }
+.rp-module--nomina { background: #EEF0F3; color: #374151; }
+.rp-module--contable { background: #E3EEFB; color: #0B4A8B; }
+.rp-module--inventario { background: #E2F5EC; color: #166534; }
+
+/* Paginación */
+.rp-pager { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+.rp-pager button { min-width: 36px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid #D5DEEA; background: #fff; font: inherit; font-size: 12.5px; font-weight: 600; color: #0A2540; cursor: pointer; }
+.rp-pager button.active { background: #0A2540; color: #fff; border-color: #0A2540; }
+.rp-pager button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Aviso de datos */
+.rp-points { background: #F6F8FB; border-radius: 12px; padding: 14px 16px; margin-top: 16px; }
+.rp-points h3 { margin: 0 0 8px; font-size: 13px; color: #0A2540; }
+.rp-point { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: #1F2937; padding: 3px 0; line-height: 1.45; }
+.rp-point svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.rp-point.warn svg { stroke: #B45309; }
+.rp-point.danger svg { stroke: #C62828; }
+.rp-point.info svg { stroke: #1565C0; }
+
+@media (max-width: 1150px) {
+  .rp-grid--2-1, .rp-grid--3, .rp-grid--1-2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .rp-grid--2 { grid-template-columns: 1fr; }
+}

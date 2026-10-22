@@ -29,7 +29,7 @@ import { AuthService } from '../auth.service';
 
         <!-- Logo -->
         <div class="login-brand">
-          <img src="/assets/logo2.png" alt="Hospedaje Sebastián Filandia" class="brand-logo">
+          <img src="/assets/brand/sogo-fondo-claro.png" alt="SOGO" class="brand-logo">
         </div>
 
         <!-- Ícono candado -->
@@ -218,7 +218,9 @@ export class ResetComponent {
         setTimeout(() => this.router.navigate(['/']), 1500);
       },
       error: (e) => {
-        this.error = e.error?.error || 'No se pudo actualizar la contraseña.';
+        this.error = e.error?.error === 'invalid or expired token'
+          ? 'El enlace ya se usó o venció (dura 1 hora). Pide uno nuevo en «¿Olvidaste tu contraseña?».'
+          : 'No se pudo actualizar la contraseña.';
       }
     });
   }

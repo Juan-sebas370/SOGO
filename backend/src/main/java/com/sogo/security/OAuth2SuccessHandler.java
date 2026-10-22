@@ -46,13 +46,27 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        User user = userService.findOrCreateOAuthUser(email, provider);
+        // La sesión de Google/Microsoft solo sirvió para comprobar el correo: SOGO usa su propio JWT
+        var sesion = request.getSession(false);
+        if (sesion != null) sesion.invalidate();
+
+        var ingreso = userService.authenticateOAuth(email, "google".equals(provider) ? "Google" : "Microsoft", request.getRemoteAddr());
+        if (!ingreso.ok()) {
+            String motivo = "no-registrado".equals(ingreso.motivo()) ? "not-registered" : ingreso.motivo();
+            response.sendRedirect(UriComponentsBuilder.fromUriString(frontendUrl + "/")
+                    .queryParam("oauthError", encode(motivo))
+                    .build().toUriString());
+            return;
+        }
+        User user = ingreso.user();
         String jwt = jwtUtil.generateToken(user.getUsername(), user.getRole());
 
         String redirect = UriComponentsBuilder.fromUriString(frontendUrl + "/oauth-callback")
                 .queryParam("token", jwt)
                 .queryParam("username", encode(user.getUsername()))
                 .queryParam("role", encode(user.getRole()))
+                .queryParam("fullName", encode(user.getFullName() == null ? "" : user.getFullName()))
+                .queryParam("email", encode(user.getEmail() == null ? "" : user.getEmail()))
                 .build().toUriString();
         response.sendRedirect(redirect);
     }

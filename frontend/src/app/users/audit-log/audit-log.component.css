@@ -1,5 +1,5 @@
 @import url('../user-list/user-list.component.css');
-@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../../shared/styles/report-page.css');
 
 .report-filters {
   display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; align-items:flex-end;

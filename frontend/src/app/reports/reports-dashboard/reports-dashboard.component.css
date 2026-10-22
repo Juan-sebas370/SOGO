@@ -1,6 +1,6 @@
 @import url('../../shared/styles/list-page.css');
 @import url('../../shared/styles/detail-page.css');
-@import url('../../tra/tra-reports/tra-reports.component.css');
+@import url('../../shared/styles/report-page.css');
 
 /* ── KPIs ─────────────────────────────────────────── */
 .report-kpi-grid {

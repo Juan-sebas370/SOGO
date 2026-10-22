@@ -45,11 +45,11 @@ import { InvoicePrintComponent } from './billing/invoice-print/invoice-print.com
 import { BillingSettingsComponent } from './billing/billing-settings/billing-settings.component';
 import { billingPermission } from './billing/billing.guard';
 import { InvoiceReportsComponent } from './billing/invoice-reports/invoice-reports.component';
-import { TraListComponent } from './tra/tra-list/tra-list.component';
-import { TraFormComponent } from './tra/tra-form/tra-form.component';
+import { TraPanelComponent } from './tra/tra-panel/tra-panel.component';
+import { TraRegistrationComponent } from './tra/tra-registration/tra-registration.component';
+import { TraSummaryComponent } from './tra/tra-summary/tra-summary.component';
 import { TraDetailComponent } from './tra/tra-detail/tra-detail.component';
-import { TraPrintComponent } from './tra/tra-print/tra-print.component';
-import { TraReportsComponent } from './tra/tra-reports/tra-reports.component';
+import { TraConfigComponent } from './tra/tra-config/tra-config.component';
 import { LodgingListComponent } from './lodging/lodging-list/lodging-list.component';
 import { CheckinFormComponent } from './lodging/checkin-form/checkin-form.component';
 import { CheckoutFormComponent } from './lodging/checkout-form/checkout-form.component';
@@ -132,13 +132,12 @@ export const routes: Routes = [
       { path: 'billing/settings',       component: BillingSettingsComponent, canActivate: [billingPermission('Configurar integración')] },
       { path: 'billing/:id',            component: InvoiceDetailComponent,   canActivate: [billingPermission('Consultar facturas')] },
       { path: 'billing/:id/corregir',   component: InvoiceNewComponent,      canActivate: [billingPermission('Validar datos fiscales')] },
-      // TRA
-      { path: 'tra',                component: TraListComponent },
-      { path: 'tra/new',            component: TraFormComponent },
-      { path: 'tra/reports',        component: TraReportsComponent },
+      // TRA (:id = id de la reserva: la TRA cuelga de ella)
+      { path: 'tra',                component: TraPanelComponent },
+      { path: 'tra/config',         component: TraConfigComponent },
       { path: 'tra/:id',            component: TraDetailComponent },
-      { path: 'tra/:id/edit',       component: TraFormComponent },
-      { path: 'tra/:id/print',      component: TraPrintComponent },
+      { path: 'tra/:id/registro',   component: TraRegistrationComponent },
+      { path: 'tra/:id/resumen',    component: TraSummaryComponent },
       // Alojamiento
       { path: 'lodging',                        component: LodgingListComponent },
       // :id = id de la reserva (la estadía es parte de la reserva)

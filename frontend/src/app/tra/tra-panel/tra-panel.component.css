@@ -1,0 +1,126 @@
+/* Indicadores, tabs, filtros, tabla y paginación: los mismos del listado de Reservas */
+@import url('../../reservations/reservations-list/reservations-list.component.css');
+@import url('../tra-base.css');
+
+/* =====================================================
+   TRA — panel
+   ===================================================== */
+
+.rsv-kpi-icon--red { background: linear-gradient(135deg, #F87171, #DC2626); }
+
+/* ── Barra de vista ───────────────────────────────── */
+.tp-viewbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 0 12px 14px;
+}
+
+.tp-segmented {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9px;
+  background: #EEF1F5;
+}
+
+.tp-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4B5563;
+  cursor: pointer;
+}
+
+.tp-segmented button span { font-size: 10.5px; color: #6B7280; }
+.tp-segmented button.active { background: #fff; color: #0A2540; box-shadow: 0 1px 3px rgba(15,23,42,0.12); }
+
+.tp-legend { flex: 1; min-width: 240px; margin: 0; font-size: 11px; color: #6B7280; }
+.tp-legend-inh { color: #9CA3AF; font-weight: 600; }
+
+.tp-expand-all {
+  border: none;
+  background: none;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0B6FD0;
+  cursor: pointer;
+}
+
+/* ── Tabla ────────────────────────────────────────── */
+.tp-table { min-width: 1560px; }
+.tp-table td { vertical-align: top; }
+.tp-table tbody + tbody { border-top: 1px solid #E6EBF2; }
+.tp-table tbody.tp-open .tp-principal { background: #F7FAFE; }
+
+.tp-num { text-align: right !important; white-space: nowrap; }
+.tp-nowrap { white-space: nowrap; }
+.tp-na { font-size: 11.5px; }
+
+.tp-col-toggle { width: 44px; padding-right: 0 !important; }
+
+.tp-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 7px 0 4px;
+  border: 1px solid #D5DEEA;
+  border-radius: 7px;
+  background: #fff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #0B4A8B;
+  cursor: pointer;
+}
+
+.tp-toggle svg {
+  width: 14px; height: 14px;
+  fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+  transition: transform 0.15s;
+}
+
+.tp-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.tp-toggle:hover { background: #F4F7FB; }
+
+.tp-type { display: table; margin-top: 5px; font-size: 10px; padding: 1px 8px; }
+
+.tp-progress { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10.5px; font-weight: 600; color: #4B5563; }
+.tp-bar { width: 54px; height: 5px; border-radius: 3px; background: #EEF1F5; overflow: hidden; }
+.tp-bar span { display: block; height: 100%; background: #F59E0B; }
+.tp-bar span.full { background: #16A34A; }
+
+.tp-name { display: block; font-size: 12.5px; white-space: nowrap; }
+.tp-name strong { font-weight: 600; }
+.tp-name + .tra-tag { margin-top: 4px; }
+
+.tp-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.tp-tag-minor { background: #F1E8FF; color: #7E22CE; }
+.tp-tag-sire  { background: #D5F5F1; color: #0F766E; }
+
+.tp-note { max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+.tp-reason { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Dato de viaje heredado del principal */
+.tp-inh, .tp-inh .tra-mono { color: #9CA3AF; }
+
+/* Filas de acompañantes */
+.tp-companion td { background: #FBFCFE; font-size: 11.5px; }
+.tp-companion--flat td { background: transparent; }
+.tp-role { font-weight: 600; color: #0B4A8B; white-space: nowrap; }
+
+.tp-missing td { color: #92400E; background: #FFFBEB; }
+.tp-missing svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.tp-missing a { margin-left: 8px; font-weight: 600; color: #0B6FD0; }
+
+.rsv-actions .rsv-btn--sm { height: 30px; }

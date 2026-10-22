@@ -1,4 +1,4 @@
-import { ReservationStatus, ReservationType, PaymentStatus, ReservationTraStatus } from './reservation.model';
+import { ReservationStatus, ReservationType, PaymentStatus } from './reservation.model';
 
 // Formato y colores compartidos por listado, detalle y formulario de reservas,
 // para que un mismo estado nunca se pinte distinto entre pantallas.
@@ -51,8 +51,4 @@ export function statusBadge(s: ReservationStatus): string {
 
 export function paymentBadge(p: PaymentStatus): string {
   return { 'Pagado': 'rsv-badge--ok', 'Parcial': 'rsv-badge--partial', 'Pendiente': 'rsv-badge--warn' }[p];
-}
-
-export function traBadge(t: ReservationTraStatus): string {
-  return { 'Completa': 'rsv-badge--ok', 'Pendiente': 'rsv-badge--warn', 'No aplica': 'rsv-badge--muted' }[t];
 }

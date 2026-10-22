@@ -6,6 +6,8 @@ import { ReservationService } from '../../reservations/reservation.service';
 import { Reservation, awaitsCheckIn, isInHouse, lodgingLabel, balance } from '../../reservations/reservation.model';
 import { fmtDate, fmtMoney } from '../../reservations/reservation-format';
 import { RoomService } from '../room.service';
+import { TraService } from '../../tra/tra.service';
+import { statusLabel as traLabel } from '../../tra/tra-rules';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
 
 @Component({
@@ -46,11 +48,11 @@ import { isoDate, isoDateTime } from '../../shared/date-utils';
         <div><dt>Entrada - Salida</dt><dd>{{ date(r.checkIn) }} - {{ date(r.checkOut) }}</dd></div>
         <div><dt>Plan / tarifa</dt><dd>{{ r.plan }}</dd></div>
         <div><dt>Saldo pendiente</dt><dd [class.flow-warn-text]="pending > 0">{{ money(pending) }}</dd></div>
-        <div><dt>TRA</dt><dd>{{ tra }}</dd></div>
+        <div><dt>TRA</dt><dd>{{ traLabel(tra) }}</dd></div>
       </dl>
-      <p class="flow-alert" *ngIf="tra === 'Pendiente'">
-        El TRA de esta reserva está pendiente.
-        <a routerLink="/dashboard/tra/new" [queryParams]="{ reserva: r.code }">Registrar TRA</a>
+      <p class="flow-alert" *ngIf="tra === 'BORRADOR' || tra === 'REQUIERE_CORRECCION'">
+        La TRA de esta reserva aún no está lista para envío.
+        <a [routerLink]="['/dashboard/tra', r.id, 'registro']">Completar TRA</a>
       </p>
       <p class="flow-alert" *ngIf="cleaningRooms.length">
         Habitación{{ cleaningRooms.length > 1 ? 'es' : '' }} {{ cleaningRooms.join(', ') }} en limpieza: al confirmar quedará{{ cleaningRooms.length > 1 ? 'n' : '' }} ocupada{{ cleaningRooms.length > 1 ? 's' : '' }}.
@@ -117,6 +119,7 @@ export class CheckinFormComponent {
   constructor(
     private svc: ReservationService,
     private roomSvc: RoomService,
+    private traSvc: TraService,
     private router: Router,
     route: ActivatedRoute
   ) {
@@ -135,7 +138,8 @@ export class CheckinFormComponent {
   }
 
   get pending(): number { return balance(this.r!); }
-  get tra() { return this.svc.traStatus(this.r!); }
+  get tra() { return this.traSvc.statusOf(this.r!); }
+  readonly traLabel = traLabel;
 
   get cleaningRooms(): string[] {
     return this.roomSvc.getSnapshot().filter(room => this.r!.rooms.includes(room.number) && room.status === 'En limpieza').map(room => room.number);

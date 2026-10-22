@@ -1,12 +1,11 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { Reservation, Payment, PaymentMethod, ReservationTraStatus, isVoid } from './reservation.model';
+import { Reservation, Payment, PaymentMethod } from './reservation.model';
 import { isoDate, isoDateTime } from '../shared/date-utils';
-import { TraService } from '../tra/tra.service';
-import { Tra } from '../tra/tra.model';
+import { roomsOnFloor } from '../lodging/house';
 
-const F1 = ['101', '102', '103'];
-const F2 = ['201', '202', '203', '204'];
+const F1 = roomsOnFloor(1);
+const F2 = roomsOnFloor(2);
 
 type SeedRow = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'docType' | 'plan' | 'observations' | 'extrasAmount' | 'payments'>
   & { paid: number; method?: PaymentMethod; extras?: number; observations?: string; inHouse?: boolean };
@@ -14,8 +13,9 @@ type SeedRow = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt' | 'do
 // Datos de demostración con fechas relativas a hoy: así los indicadores
 // (reservas de hoy, próximas, actuales...) siempre muestran algo coherente,
 // sin importar el día en que se abra el sistema. Las habitaciones son las del
-// catálogo real de RoomService y ninguna queda reservada dos veces a la vez.
-// Los códigos RSV-<año>-00108… son los que referencia el seed de TraService.
+// catálogo de la casa (lodging/house.ts), ninguna queda reservada dos veces a
+// la vez y los huéspedes caben en su capacidad.
+// Los códigos RSV-<año>-00108… son los que referencia el seed del módulo TRA.
 function seed(): Reservation[] {
   const year = new Date().getFullYear();
   const rows: SeedRow[] = [
@@ -71,17 +71,7 @@ function seed(): Reservation[] {
 export class ReservationService {
 
   private data: Reservation[] = seed();
-  private tras: Tra[] = [];
   private reservations$ = new BehaviorSubject<Reservation[]>(this.data);
-
-  constructor(private traService: TraService) {
-    // El estado TRA de cada reserva sale del módulo TRA: si allí se registra o
-    // anula un TRA, las pantallas de reservas deben enterarse.
-    this.traService.getAll().subscribe(list => {
-      this.tras = list;
-      this.reservations$.next(this.data);
-    });
-  }
 
   getAll(): Observable<Reservation[]> {
     return this.reservations$.asObservable();
@@ -93,17 +83,6 @@ export class ReservationService {
 
   getById(id: string): Reservation | undefined {
     return this.data.find(r => r.id === id);
-  }
-
-  // ── TRA ──
-  /** TRA vigente de la reserva (el más reciente que no esté anulado). */
-  traFor(r: Reservation): Tra | undefined {
-    return this.tras.find(t => t.reservationCode === r.code && t.status !== 'Anulada');
-  }
-
-  traStatus(r: Reservation): ReservationTraStatus {
-    if (isVoid(r) || r.reservationType === 'Evento / Pasadía') return 'No aplica';
-    return this.traFor(r)?.status === 'Generada' ? 'Completa' : 'Pendiente';
   }
 
   // ── Escritura ──

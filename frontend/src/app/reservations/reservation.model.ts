@@ -4,8 +4,6 @@ export type ReservationType   = 'Individual' | 'Grupo familiar' | 'Grupo de trab
 export type LodgingType       = 'Habitación' | 'Piso' | 'Casa completa';
 export type PaymentStatus     = 'Pagado' | 'Parcial' | 'Pendiente';
 export type PaymentMethod     = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Transferencia' | 'Tarjeta';
-// Estado del TRA para la reserva. No se guarda: ReservationService lo deriva del módulo TRA.
-export type ReservationTraStatus = 'Completa' | 'Pendiente' | 'No aplica';
 
 export interface Payment {
   date:    string;          // YYYY-MM-DDTHH:mm

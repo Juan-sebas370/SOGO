@@ -132,11 +132,6 @@ import { UsersService } from '../users/users.service';
               <img src="/assets/google.jpg" alt="Google">
               Google
             </button>
-            <button class="social" type="button" (click)="loginWithMicrosoft()" [disabled]="!oauthReady || !oauthProviders.azure"
-                    [title]="oauthReady && !oauthProviders.azure ? 'No disponible: falta configurar Microsoft en el servidor' : ''">
-              <img src="/assets/microsoft.svg" alt="Microsoft">
-              Microsoft
-            </button>
           </div>
 
           <!-- Error -->
@@ -174,7 +169,7 @@ export class LoginComponent implements OnInit {
   remember     = false;
 
   oauthReady = false;
-  oauthProviders = { google: false, azure: false };
+  oauthProviders = { google: false };
 
   constructor(private auth: AuthService, private router: Router, private users: UsersService) {}
 
@@ -202,10 +197,6 @@ export class LoginComponent implements OnInit {
 
   loginWithGoogle(): void {
     window.location.href = `${API_ROOT}/oauth2/authorization/google`;
-  }
-
-  loginWithMicrosoft(): void {
-    window.location.href = `${API_ROOT}/oauth2/authorization/azure`;
   }
 
   submit(): void {

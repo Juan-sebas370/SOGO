@@ -76,7 +76,19 @@ export class TraService {
     this.settings = { ...this.defaults(), ...saved };
     if (units?.length) this.units = units;
     this.syncWithReservations();
+    await this.users.ready();   // promoteCompleteDrafts mira los permisos de la sesión
+    this.promoteCompleteDrafts();
     this.emit();
+  }
+
+  /** Borradores guardados que ya cumplen todas las validaciones pasan a «Lista para envío». */
+  private promoteCompleteDrafts(): void {
+    if (!this.users.can('TRA', 'edit')) return;
+    this.records.forEach((rec, id) => {
+      if (rec.status !== 'BORRADOR' || !this.isEditable(rec) || !this.validation(id, rec)?.ok) return;
+      this.records.set(id, { ...rec, status: 'LISTA_PARA_ENVIO' });
+      this.persist(id);
+    });
   }
 
   /**
@@ -115,6 +127,13 @@ export class TraService {
     return this.viewStatus(r, this.records.get(r.id));
   }
 
+  /** ¿La TRA permite el check-in? Un borrador con todos los datos válidos también cuenta. */
+  isReadyForCheckIn(r: Reservation): boolean {
+    const s = this.statusOf(r);
+    if (s === 'REQUIERE_CORRECCION') return !!this.validation(r.id)?.ok;
+    return s !== 'BORRADOR' || !!this.validation(r.id)?.ok;
+  }
+
   getUnits(): LodgingUnit[] { return this.units; }
   getSettings(): TraSettings { return this.settings; }
 
@@ -145,7 +164,10 @@ export class TraService {
   saveRegistration(reservationId: string, units: TraUnit[], guests: TraGuest[], auto = false): void {
     const rec = this.records.get(reservationId);
     if (!rec || !this.isEditable(rec)) return;
-    this.put({ ...rec, units: clone(units), guests: clone(guests), status: 'BORRADOR' }, auto ? undefined
+    // Completa y válida queda lista para envío sola: antes quedaba en borrador hasta pulsar
+    // «Validar», y el check-in la seguía pidiendo aunque el panel la mostrara completa.
+    const next = { ...rec, units: clone(units), guests: clone(guests) };
+    this.put({ ...next, status: this.validation(reservationId, next)?.ok ? 'LISTA_PARA_ENVIO' : 'BORRADOR' }, auto ? undefined
       : this.event('Registro de huéspedes actualizado', `${guests.length} huésped${guests.length === 1 ? '' : 'es'} · ${this.actor()}`, 'muted'));
   }
 
@@ -158,7 +180,7 @@ export class TraService {
     const v = this.validation(reservationId);
     if (!rec || !v || !this.isEditable(rec)) return v;
     this.put({ ...rec, status: v.ok ? 'LISTA_PARA_ENVIO' : 'REQUIERE_CORRECCION' },
-      this.event(`Validación previa: ${v.passed} de ${v.checks.length}`, v.ok ? 'Lista para enviar en el check-in' : v.issues[0].message, v.ok ? 'info' : 'danger'));
+      this.event(`Validación previa: ${v.passed} de ${v.checks.length}`, v.ok ? 'Lista para enviar en el check-in' : v.issues[0]?.message ?? 'Revisa la validación', v.ok ? 'info' : 'danger'));
     return v;
   }
 
@@ -169,6 +191,8 @@ export class TraService {
     const r = this.reservations.find(x => x.id === reservationId);
     const v = this.markValidated(reservationId);
     if (!rec || !r || !this.isEditable(rec) || !v?.ok || !this.checkInReached(r)) return;
+    // Sin integración activa no hay a dónde enviar: queda lista y se reporta a mano desde el detalle
+    if (!this.settings.integrationActive) return;
 
     const sends: TraSend[] = rec.guests.map((g, i) => ({ guestId: g.id, endpoint: i === 0 ? 'ONE' : 'TWO', status: 'PENDIENTE', attempts: 0 }));
     this.put({ ...this.records.get(reservationId)!, sends, status: 'ENVIANDO', checkInAt: now(), sentBy: this.actor() },

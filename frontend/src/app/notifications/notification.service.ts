@@ -76,7 +76,7 @@ export class NotificationService {
     const on = (key: AlertKey) => this.settings.inApp(key);
 
     if (on('arrivals') && departuresCount > 0) {
-      list.push({ icon: 'checkout', level: 'Alta', label: 'Check-out pendiente', detail: `${departuresCount} salida(s) por gestionar`, link: '/dashboard/lodging' });
+      list.push({ icon: 'checkout', level: 'Alta', label: 'Check-out pendiente', detail: `${departuresCount} salida(s) por gestionar`, link: '/dashboard/lodging/recepcion' });
     }
     cleaningRooms.forEach(r => {
       list.push({ icon: 'cleaning', level: 'Media', label: 'Habitación en limpieza', detail: `Habitación ${r.number} · Piso ${r.floor}`, link: '/dashboard/lodging' });

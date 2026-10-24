@@ -86,6 +86,7 @@ export function totalGuests(r: Reservation): number {
 export function lodgingLabel(r: Reservation): string {
   if (r.lodgingType === 'Casa completa') return 'Casa completa';
   if (r.lodgingType === 'Piso') return `Piso ${r.floor}`;
+  if (!r.rooms.length) return 'Sin habitación asignada';
   return r.rooms.length === 1 ? `Hab. ${r.rooms[0]}` : `${r.rooms.length} habitaciones`;
 }
 

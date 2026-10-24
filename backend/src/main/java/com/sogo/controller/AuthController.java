@@ -38,8 +38,7 @@ public class AuthController {
     public ResponseEntity<?> oauthProviders() {
         ClientRegistrationRepository repo = clientRegistrations.getIfAvailable();
         boolean google = repo != null && repo.findByRegistrationId("google") != null;
-        boolean azure = repo != null && repo.findByRegistrationId("azure") != null;
-        return ResponseEntity.ok(Map.of("google", google, "azure", azure));
+        return ResponseEntity.ok(Map.of("google", google));
     }
 
     @PostMapping("/login")
@@ -61,6 +60,20 @@ public class AuthController {
         resp.put("fullName", user.getFullName());
         resp.put("email", user.getEmail());
         return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * Renueva el JWT de una sesión que se está usando (el navegador lo pide antes de que venza).
+     * El cierre por inactividad lo decide el navegador según Seguridad y acceso; el token solo
+     * vence si la pestaña deja de pedir renovación.
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestHeader(value = "Authorization", required = false) String auth) {
+        String token = auth != null && auth.startsWith("Bearer ") ? auth.substring(7) : null;
+        String username = token != null ? jwtUtil.validateAndGetUsername(token) : null;
+        var user = username != null ? userService.sesionVigente(username) : java.util.Optional.<User>empty();
+        if (user.isEmpty()) return ResponseEntity.status(401).body(Map.of("error", "Sesión vencida o inválida"));
+        return ResponseEntity.ok(Map.of("token", jwtUtil.generateToken(user.get().getUsername(), user.get().getRole())));
     }
 
     // El JWT no se guarda en el servidor: cerrar sesión es borrarlo en el navegador

@@ -14,6 +14,7 @@ import { isoDate } from '../../shared/date-utils';
 import { openDocument } from '../../shared/documents';
 import { dmy } from '../accounting-format';
 import { amountInWords, blankVoucherHtml } from '../voucher';
+import { AccountPickerComponent } from '../account-picker/account-picker.component';
 
 interface Row { account: string; detail: string; third: string; thirdDoc: string; costCenter: string; debit: number | null; credit: number | null; }
 
@@ -30,7 +31,7 @@ const DOCS: { kind: EntryKind; label: string; help: string }[] = [
 @Component({
   selector: 'app-accounting-movement',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, AccountPickerComponent],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../accounting.css'],
   template: `
   <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/accounting">Contabilidad</a><span>/</span><span>Nuevo comprobante</span></nav>
@@ -73,8 +74,8 @@ const DOCS: { kind: EntryKind; label: string; help: string }[] = [
       <label class="kit-field" *ngIf="isNote">Factura que afecta *<input class="rsv-input" [(ngModel)]="invoiceRef" placeholder="Ej.: FE-1052" [class.invalid]="tried && !invoiceRef.trim()"></label>
       <label class="kit-field" *ngIf="kind === 'Nota crédito'">Motivo *<select class="rsv-input" [(ngModel)]="noteReason"><option value="">Selecciona…</option><option *ngFor="let m of reasons">{{ m }}</option></select></label>
       <label class="kit-field wide">Concepto *<input class="rsv-input" [(ngModel)]="concept" [placeholder]="conceptHint" [class.invalid]="tried && !concept.trim()"></label>
-      <label class="kit-field">Documento soporte *
-        <span class="acc-file" [class.ok]="support" [class.invalid]="tried && !support">
+      <label class="kit-field">Documento soporte <span class="kit-muted">(opcional)</span>
+        <span class="acc-file" [class.ok]="support">
           <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>{{ support || 'Adjuntar soporte' }}<input type="file" [accept]="accept" (change)="attach($event)"></span></label>
       <label class="kit-field">Período contable<input class="rsv-input acc-readonly" [value]="periodLabel" readonly></label>
     </div>
@@ -90,8 +91,7 @@ const DOCS: { kind: EntryKind; label: string; help: string }[] = [
         <thead><tr><th>Código · cuenta</th><th>Tercero</th><th>Centro de costo</th><th>Descripción</th><th class="r">Débito</th><th class="r">Crédito</th><th></th></tr></thead>
         <tbody>
           <tr *ngFor="let r of rows; let i = index">
-            <td><select class="rsv-input mv-acc" [(ngModel)]="r.account" [class.invalid]="tried && !r.account" [attr.aria-label]="'Cuenta de la línea ' + (i + 1)">
-              <option value="">Selecciona una cuenta…</option><option *ngFor="let a of accounts" [value]="a.code">{{ a.code }} · {{ a.name }}</option></select></td>
+            <td><app-account-picker class="mv-acc" [(ngModel)]="r.account" [accounts]="accountList" [invalid]="tried && !r.account" [ariaLabel]="'Cuenta de la línea ' + (i + 1)"></app-account-picker></td>
             <td><input class="rsv-input mv-third" [(ngModel)]="r.third" [placeholder]="third || 'Tercero'" aria-label="Tercero">
               <input class="rsv-input mv-doc" [(ngModel)]="r.thirdDoc" [placeholder]="thirdDoc || 'NIT / CC'" aria-label="NIT o CC"></td>
             <td><select class="rsv-input mv-cc" [(ngModel)]="r.costCenter" [class.invalid]="tried && !asDraft && !r.costCenter" aria-label="Centro de costo">
@@ -138,7 +138,7 @@ const DOCS: { kind: EntryKind; label: string; help: string }[] = [
     .mv-doc-box span { font-size: 12px; } .mv-doc-box code { font-weight: 700; }
     .mv-doc-box small { font-size: 10.5px; color: #6B7280; }
     .mv-table td { padding: 6px 6px; vertical-align: top; }
-    .mv-acc { min-width: 240px; }
+    .mv-acc { display: block; min-width: 260px; }
     .mv-third, .mv-doc { min-width: 140px; }
     .mv-doc { margin-top: 4px; font-size: 12px; height: 32px; }
     .mv-cc { min-width: 150px; }
@@ -159,6 +159,8 @@ export class MovementComponent {
   readonly methods = PAYMENT_METHODS;
   readonly reasons = NOTE_REASONS_CREDIT;
   get accounts() { return activeAccounts(); }
+  /** Lista fija para el buscador de cuentas (un getter nuevo en cada ciclo lo haría refiltrar sin necesidad). */
+  readonly accountList = activeAccounts();
   get centers() { return COST_CENTERS.filter(c => c.active); }
 
   kind: EntryKind = 'Ingreso';

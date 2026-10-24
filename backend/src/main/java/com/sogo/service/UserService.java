@@ -97,7 +97,7 @@ public class UserService {
     }
 
     /**
-     * Login social (Google o Microsoft): solo para correos que ya son cuentas del personal; nunca
+     * Login social con Google: solo para correos que ya son cuentas del personal; nunca
      * crea cuentas. Aplica las mismas reglas que el login con contraseña (bloqueada, desactivada,
      * activación vencida, sin rol) y deja la misma constancia en la auditoría.
      * motivo: no-registrado | bloqueada | desactivada | con activación vencida | sin acceso a SOGO
@@ -164,6 +164,11 @@ public class UserService {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
+    }
+
+    /** Renovación del token de una sesión en uso: solo si la cuenta todavía puede entrar. */
+    public Optional<User> sesionVigente(String username) {
+        return findUsuario(username).filter(u -> motivoRechazo(u) == null).map(this::toUser);
     }
 
     /** null si puede entrar; si no, por qué (bloqueada, desactivada, sin acceso…). */

@@ -22,12 +22,17 @@ export class AuthService {
     return this.http.post(`${this.base}/logout`, {}, { headers });
   }
 
+  /** Token nuevo para la sesión en uso (el interceptor pone el actual en la cabecera). */
+  refresh(): Observable<{ token: string }> {
+    return this.http.post<{ token: string }>(`${this.base}/refresh`, {});
+  }
+
   getRole(): string | null {
     return localStorage.getItem('sogo_role');
   }
 
-  getOAuthProviders(): Observable<{ google: boolean; azure: boolean }> {
-    return this.http.get<{ google: boolean; azure: boolean }>(`${this.base}/oauth-providers`);
+  getOAuthProviders(): Observable<{ google: boolean }> {
+    return this.http.get<{ google: boolean }>(`${this.base}/oauth-providers`);
   }
 
   resetRequest(email: string){

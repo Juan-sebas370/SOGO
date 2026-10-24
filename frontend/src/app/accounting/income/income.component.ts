@@ -62,8 +62,8 @@ interface Form { date: string; category: string; concept: string; third: string;
             <select class="rsv-input" [(ngModel)]="f.method" (ngModelChange)="onMethod()" [class.invalid]="tried && !f.method"><option value="">Selecciona…</option><option *ngFor="let m of methods">{{ m.name }}</option></select></label>
           <label class="kit-field">Cuenta destino *
             <select class="rsv-input" [(ngModel)]="f.account"><option *ngFor="let a of destAccounts" [value]="a">{{ label(a) }}</option></select></label>
-          <label class="kit-field">Documento soporte *
-            <span class="acc-file" [class.ok]="f.support" [class.invalid]="tried && !f.support">
+          <label class="kit-field">Documento soporte <span class="kit-muted">(opcional)</span>
+            <span class="acc-file" [class.ok]="f.support">
               <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               {{ f.support || 'Adjuntar factura o recibo' }}<input type="file" [accept]="accept" (change)="attach($event)"></span></label>
           <label class="kit-field wide">Observaciones<textarea class="rsv-input" rows="2" [(ngModel)]="f.observations"></textarea></label>

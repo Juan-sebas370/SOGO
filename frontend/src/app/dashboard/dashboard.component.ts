@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, OnDestroy } from '@angular/core';
+import { Component, ElementRef, HostListener, NgZone, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
@@ -8,6 +8,10 @@ import { UsersService } from '../users/users.service';
 import { Module } from '../users/users.model';
 import { MessagesService } from '../messages/messages.service';
 import { BillingAction, BillingConfigService } from '../billing/billing-config.service';
+import { AuthService } from '../auth.service';
+
+/** Última actividad en cualquier pestaña de SOGO (para el cierre por inactividad). */
+const ACTIVITY_KEY = 'sogo_last_activity';
 
 @Component({
   selector: 'app-dashboard',
@@ -257,7 +261,7 @@ export class DashboardComponent implements OnDestroy {
     ],
     lodging: [
       { label: 'Habitaciones',          link: '/dashboard/lodging',                exact: true },
-      { label: 'Registrar check-in',    link: '/dashboard/lodging/checkin',        exact: false },
+      { label: 'Llegadas y salidas',    link: '/dashboard/lodging/recepcion',      exact: false },
       { label: 'Tarifas y temporadas',  link: '/dashboard/lodging/rates',          exact: false },
     ],
     tra: [
@@ -357,7 +361,12 @@ export class DashboardComponent implements OnDestroy {
   private unreadTimer?: ReturnType<typeof setInterval>;
 
   constructor(private router: Router, private notificationService: NotificationService, private elementRef: ElementRef, private users: UsersService,
-              private messages: MessagesService, readonly billingConfig: BillingConfigService) {
+              private messages: MessagesService, readonly billingConfig: BillingConfigService, private auth: AuthService, private zone: NgZone) {
+    // Fuera de Angular: mover el ratón no debe redibujar la pantalla. Solo el cierre vuelve a entrar.
+    this.zone.runOutsideAngular(() => {
+      this.activityEvents.forEach(e => window.addEventListener(e, this.onActivity, { capture: true, passive: true }));
+      document.addEventListener('visibilitychange', this.onVisible);
+    });
     this.messages.unread$.subscribe(n => this.unread = n);
     this.messages.refreshUnread();
     this.unreadTimer = setInterval(() => this.messages.refreshUnread(), 120_000);
@@ -375,27 +384,76 @@ export class DashboardComponent implements OnDestroy {
     return segment in this.submenus ? segment : '';
   }
 
+  // ── Inactividad ──
+  // Cuenta como uso cualquier interacción (también desplazarse o mover el ratón al leer) en
+  // cualquier pestaña de SOGO: la última actividad se comparte por localStorage.
   private lastActivity = Date.now();
+  private lastShared = 0;
+  private refreshing = false;
   private idleTimer = setInterval(() => this.checkIdle(), 30_000);
+  private readonly activityEvents = ['keydown', 'mousemove', 'mousedown', 'wheel', 'scroll', 'touchstart', 'pointerdown', 'input'];
+  private readonly onActivity = () => this.markActivity();
+  private readonly onVisible = () => { if (document.visibilityState === 'visible') this.checkIdle(); };
 
-  @HostListener('document:keydown')
-  @HostListener('document:mousemove')
-  @HostListener('document:touchstart')
-  markActivity(): void { this.lastActivity = Date.now(); }
+  private markActivity(): void {
+    // Al volver después de mucho tiempo (equipo suspendido, pestaña olvidada) primero se revisa
+    // si ya se pasó el tiempo: mover el ratón al regresar no debe revivir la sesión.
+    if (this.idleExpired()) { this.closeIdle(); return; }
+    const now = Date.now();
+    this.lastActivity = now;
+    if (now - this.lastShared > 5_000) {
+      this.lastShared = now;
+      try { localStorage.setItem(ACTIVITY_KEY, String(now)); } catch { /* sin almacenamiento: solo esta pestaña */ }
+    }
+  }
+
+  private lastSeen(): number {
+    const shared = Number(localStorage.getItem(ACTIVITY_KEY)) || 0;
+    return Math.max(this.lastActivity, shared);
+  }
+
+  private idleExpired(): boolean {
+    const minutes = this.users.policy.idleMinutes;
+    return !!minutes && Date.now() - this.lastSeen() >= minutes * 60_000;
+  }
 
   /** Cierra la sesión si no hubo actividad durante el tiempo configurado en Seguridad y acceso. */
   private checkIdle(): void {
-    const minutes = this.users.policy.idleMinutes;
-    if (!minutes || Date.now() - this.lastActivity < minutes * 60_000) return;
-    this.users.addLog('Sesión: sesión cerrada por inactividad', `${minutes} min sin uso`);
-    this.logout();
+    if (!localStorage.getItem('sogo_token')) return;
+    if (this.idleExpired()) { this.closeIdle(); return; }
+    this.renewToken();
   }
 
-  ngOnDestroy(): void { clearInterval(this.idleTimer); clearInterval(this.unreadTimer); }
+  private closeIdle(): void {
+    const minutes = this.users.policy.idleMinutes;
+    this.zone.run(() => {
+      this.users.addLog('Sesión: sesión cerrada por inactividad', `${minutes} min sin uso`);
+      this.logout();
+    });
+  }
+
+  /** Mientras la sesión sigue en uso, pide un token nuevo antes de que venza el actual (dura una hora). */
+  private renewToken(): void {
+    const token = localStorage.getItem('sogo_token');
+    if (!token || this.refreshing) return;
+    let exp = 0;
+    try { exp = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000; } catch { return; }
+    if (exp - Date.now() > 30 * 60_000) return;
+    this.refreshing = true;
+    this.auth.refresh().subscribe({
+      next: r => { if (localStorage.getItem('sogo_token')) localStorage.setItem('sogo_token', r.token); this.refreshing = false; },
+      error: () => { this.refreshing = false; },
+    });
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.idleTimer); clearInterval(this.unreadTimer);
+    this.activityEvents.forEach(e => window.removeEventListener(e, this.onActivity, true));
+    document.removeEventListener('visibilitychange', this.onVisible);
+  }
 
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent): void {
-    this.lastActivity = Date.now();
     if (this.showNotifications && !this.elementRef.nativeElement.querySelector('.dash-notif-wrap')?.contains(event.target)) {
       this.showNotifications = false;
     }

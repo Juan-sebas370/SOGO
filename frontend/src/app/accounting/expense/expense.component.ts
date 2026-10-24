@@ -83,10 +83,10 @@ const GROUPS: { name: string; test: (c: string) => boolean }[] = [
             <span class="kit-error" *ngIf="tried && !f.method">Campo obligatorio</span></label>
           <label class="kit-field">Retención en la fuente
             <select class="rsv-input" [(ngModel)]="f.retention"><option *ngFor="let r of retentions" [value]="r.name">{{ r.name }}{{ r.rate ? ' · ' + money(retentionOf(r.rate)) : '' }}</option></select></label>
-          <label class="kit-field">Documento soporte *
-            <span class="acc-file" [class.ok]="f.support" [class.invalid]="tried && !f.support">
+          <label class="kit-field">Documento soporte <span class="kit-muted">(opcional)</span>
+            <span class="acc-file" [class.ok]="f.support">
               <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M5 20h14"/></svg>{{ f.support || 'Adjuntar factura del proveedor' }}<input type="file" [accept]="accept" (change)="attach($event)"></span>
-            <span class="kit-error" *ngIf="tried && !f.support">Adjunta la factura o cuenta de cobro</span></label>
+            </label>
           <label class="kit-field wide">Observaciones<textarea class="rsv-input" rows="2" [(ngModel)]="f.observations"></textarea></label>
         </div>
         <div class="acc-foot">
@@ -187,9 +187,8 @@ export class ExpenseComponent {
     if (!this.f.method) e.push('falta el método de pago');
     if (!this.f.third.trim()) e.push('falta el tercero');
     if (!this.thirdDoc.trim()) e.push('falta el NIT o CC del tercero');
-    if (!this.f.support) e.push('falta el documento soporte');
     if (!this.f.concept.trim()) e.push('falta el concepto');
-    const rest = this.svc.validate(this.entry()).filter(x => !['falta el documento soporte', 'falta el concepto', 'hay partidas sin cuenta'].includes(x));
+    const rest = this.svc.validate(this.entry()).filter(x => !['falta el concepto', 'hay partidas sin cuenta'].includes(x));
     return [...e, ...rest];
   }
 

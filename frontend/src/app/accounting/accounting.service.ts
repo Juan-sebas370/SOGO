@@ -250,7 +250,6 @@ export class AccountingService {
     if (e.lines.some(l => (l.debit > 0) === (l.credit > 0))) errors.push('cada partida lleva valor solo en débito o solo en crédito');
     if (e.lines.some(l => l.debit < 0 || l.credit < 0)) errors.push('no se permiten valores negativos');
     if (!isBalanced(e.lines)) errors.push('débitos y créditos no suman igual');
-    if (!e.draft && !e.supports.length && !e.files?.length) errors.push('falta el documento soporte');
     return errors;
   }
 

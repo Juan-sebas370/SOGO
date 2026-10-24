@@ -333,7 +333,6 @@ public class ContabilidadService {
             List<Archivo> adjuntos = new ArrayList<>();
             for (JsonNode f : b.path("files")) adjuntos.add(archivo(f));
             if (adjuntos.size() > MAX_ARCHIVOS) errores.add("máximo " + MAX_ARCHIVOS + " archivos por comprobante");
-            if (!borrador && soportes(b).isEmpty() && adjuntos.isEmpty()) errores.add("falta el documento soporte");
             errores.addAll(validarDocumento(tipo, b, borrador));
             if (!errores.isEmpty()) throw new ResponseStatusException(BAD_REQUEST, "No se puede registrar: " + String.join(", ", errores));
             long id = insertar(b, tipo, fecha, "Manual", null, borrador ? "Borrador" : "Contabilizado", uid, nombre);
@@ -348,7 +347,6 @@ public class ContabilidadService {
             ObjectNode a = buscar(id);
             if (!"Borrador".equals(a.path("status").asText())) throw new ResponseStatusException(CONFLICT, "Solo un borrador se puede contabilizar");
             List<String> errores = validar(LocalDate.parse(a.path("date").asText()), a.path("concept").asText(), a.path("lines"), true);
-            if (a.path("supports").isEmpty() && a.path("files").isEmpty()) errores.add("falta el documento soporte");
             errores.addAll(validarDocumento(a.path("kind").asText(), a, false));
             if (!errores.isEmpty()) throw new ResponseStatusException(BAD_REQUEST, "No se puede contabilizar: " + String.join(", ", errores));
             jdbc.update("UPDATE asientos SET estado = 'Contabilizado', actualizado_at = NOW() WHERE id = ?", id);
@@ -703,14 +701,11 @@ public class ContabilidadService {
         return r.get(0);
     }
 
-    /** Quita un archivo: de un borrador siempre; de uno contabilizado solo si le queda otro soporte. */
+    /** Quita un archivo de un comprobante no anulado (el soporte es opcional). */
     public ObjectNode quitarSoporte(long id, long soporte) {
         return tx.execute(s -> {
             ObjectNode a = buscar(id);
             if ("Anulado".equals(a.path("status").asText())) throw new ResponseStatusException(CONFLICT, "El comprobante está anulado");
-            boolean borrador = "Borrador".equals(a.path("status").asText());
-            if (!borrador && a.path("files").size() + a.path("supports").size() <= 1)
-                throw new ResponseStatusException(CONFLICT, "Un comprobante contabilizado debe conservar al menos un soporte: agrega el nuevo antes de quitar este");
             if (jdbc.update("DELETE FROM asiento_soportes WHERE id = ? AND asiento_id = ? AND contenido IS NOT NULL", soporte, id) == 0)
                 throw new ResponseStatusException(NOT_FOUND, "El archivo no existe");
             return buscar(id);

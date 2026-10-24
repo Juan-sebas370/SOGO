@@ -12,9 +12,41 @@ import { fmtDate, fmtMoney, paymentBadge } from '../reservation-format';
 import { RoomService } from '../../lodging/room.service';
 import { SettingsService } from '../../settings/settings.service';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
+import { CO_DEPARTMENTS, townsOf } from '../../shared/colombia';
+import { COUNTRIES } from '../../tra/tra-catalogs';
 
 /** Quita espacios de más: "  maría   fernanda " → "maría fernanda". */
 const clean = (v?: string) => (v ?? '').trim().replace(/\s+/g, ' ');
+
+/** El hospedaje solo ofrece alojamiento (no vende comida): toda reserva queda con este plan. */
+const PLAN = 'Solo alojamiento';
+
+/** Lugar de residencia por partes. Se guarda en un solo texto "País - Municipio, Departamento",
+ *  que es el formato que leen Facturación y TRA. */
+interface Place { country: string; department: string; town: string; }
+
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+/** Separa el texto guardado. Acepta también los registros viejos sin país ("Pereira, Risaralda"). */
+function parsePlace(text: string): Place {
+  const raw = (text ?? '').trim();
+  if (!raw) return { country: 'Colombia', department: '', town: '' };
+  const [head, rest] = raw.includes(' - ') ? raw.split(' - ', 2) : ['', raw];
+  const [townRaw = '', depRaw = ''] = rest.split(',').map(s => s.trim());
+  const country = head.trim() || 'Colombia';
+  if (norm(country) !== 'colombia') return { country, department: depRaw, town: townRaw };
+  // En Colombia se ajusta al nombre exacto del catálogo (tildes y mayúsculas)
+  const dep = CO_DEPARTMENTS.find(d => norm(d.name) === norm(depRaw));
+  const town = dep?.towns.find(t => norm(t) === norm(townRaw)) ?? '';
+  return { country: 'Colombia', department: dep?.name ?? '', town };
+}
+
+function formatPlace(p: Place): string {
+  const country = clean(p.country), town = clean(p.town), dep = clean(p.department);
+  const local = [town, dep].filter(Boolean).join(', ');
+  if (!local) return norm(country) === 'colombia' || !country ? '' : country;
+  return `${country || 'Colombia'} - ${local}`;
+}
 
 /** Día siguiente a una fecha YYYY-MM-DD. */
 const nextDay = (iso: string) => { const d = new Date(`${iso}T12:00`); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -80,10 +112,40 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
           <input id="email" type="email" class="rsv-input" [(ngModel)]="d.email" placeholder="correo@ejemplo.com">
         </div>
       </div>
-      <div class="rsv-field">
-        <label for="city">Ciudad / Departamento</label>
-        <input id="city" type="text" class="rsv-input" [(ngModel)]="d.city" placeholder="Colombia - Armenia, Quindío">
+      <div class="rsv-form-row rsv-form-row--3">
+        <div class="rsv-field">
+          <label for="country">País</label>
+          <input id="country" type="text" class="rsv-input" list="rsv-countries" [(ngModel)]="place.country" (ngModelChange)="onCountry()" autocomplete="country-name" placeholder="Colombia">
+          <datalist id="rsv-countries"><option *ngFor="let c of countries" [value]="c"></option></datalist>
+        </div>
+        <ng-container *ngIf="isColombia; else abroad">
+          <div class="rsv-field">
+            <label for="department">Departamento</label>
+            <select id="department" class="rsv-input" [(ngModel)]="place.department" (ngModelChange)="place.town = ''">
+              <option value="">Selecciona…</option>
+              <option *ngFor="let dep of departments" [value]="dep.name">{{ dep.name }}</option>
+            </select>
+          </div>
+          <div class="rsv-field">
+            <label for="town">Municipio</label>
+            <select id="town" class="rsv-input" [(ngModel)]="place.town" [disabled]="!place.department">
+              <option value="">{{ place.department ? 'Selecciona…' : 'Elige el departamento' }}</option>
+              <option *ngFor="let t of towns" [value]="t">{{ t }}</option>
+            </select>
+          </div>
+        </ng-container>
+        <ng-template #abroad>
+          <div class="rsv-field">
+            <label for="region">Estado / provincia</label>
+            <input id="region" type="text" class="rsv-input" [(ngModel)]="place.department" maxlength="60">
+          </div>
+          <div class="rsv-field">
+            <label for="cityAbroad">Ciudad</label>
+            <input id="cityAbroad" type="text" class="rsv-input" [(ngModel)]="place.town" maxlength="60">
+          </div>
+        </ng-template>
       </div>
+      <p class="rsv-form-hint" *ngIf="placeUnmatched">Lugar registrado antes: «{{ placeUnmatched }}». Elígelo en los campos de arriba para actualizarlo; si no los tocas, se conserva así.</p>
       <div class="rsv-field">
         <label for="obs">Observaciones</label>
         <textarea id="obs" rows="3" class="rsv-input" [(ngModel)]="d.observations" placeholder="Solicitudes especiales, hora de llegada..."></textarea>
@@ -104,12 +166,6 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
           <label for="channel">Canal</label>
           <select id="channel" class="rsv-input" [(ngModel)]="d.channel">
             <option *ngFor="let o of channels">{{ o }}</option>
-          </select>
-        </div>
-        <div class="rsv-field">
-          <label for="plan">Plan / tarifa</label>
-          <select id="plan" class="rsv-input" [(ngModel)]="d.plan">
-            <option *ngFor="let o of plans">{{ o }}</option>
           </select>
         </div>
       </div>
@@ -273,10 +329,22 @@ export class ReservationFormComponent implements OnInit {
   // salen del flujo de alojamiento o de la acción "Cancelar reserva".
   readonly statusOptions: ReservationStatus[] = ['Pendiente', 'Confirmada'];
   readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
-  readonly plans = ['Solo alojamiento', 'Desayuno incluido', 'Media pensión', 'Todo incluido'];
 
   readonly money = fmtMoney;
   readonly paymentBadge = paymentBadge;
+
+  readonly departments = CO_DEPARTMENTS;
+  readonly countries = [...new Set(['Colombia', ...COUNTRIES.map(c => c.name), 'Alemania', 'Brasil', 'Costa Rica', 'Italia', 'Países Bajos', 'Reino Unido', 'República Dominicana', 'Suiza', 'Uruguay', 'Venezuela'])];
+  place: Place = { country: 'Colombia', department: '', town: '' };
+  private placeLoaded = '';
+  /** Lugar guardado que no se pudo ubicar en el catálogo (se muestra para elegirlo de nuevo). */
+  placeUnmatched = '';
+  get isColombia(): boolean { return norm(this.place.country || 'Colombia') === 'colombia'; }
+  get towns(): string[] { return townsOf(this.place.department); }
+  onCountry(): void {
+    // Al pasar de Colombia a otro país (o al revés) lo elegido ya no aplica
+    if (this.isColombia !== !!CO_DEPARTMENTS.find(d => d.name === this.place.department)) this.place = { ...this.place, department: '', town: '' };
+  }
 
   isEdit = false;
   splitSuggested = false;
@@ -292,7 +360,7 @@ export class ReservationFormComponent implements OnInit {
     reservationType: 'Individual', channel: 'Directo', lodgingType: 'Habitación', rooms: [],
     adults: 1, children: 0, infants: 0,
     checkIn: '', checkOut: '', nights: 0,
-    plan: 'Desayuno incluido',
+    plan: PLAN,
     lodgingAmount: 0, extrasAmount: 0, payments: [],
     status: 'Pendiente', observations: ''
   };
@@ -318,6 +386,9 @@ export class ReservationFormComponent implements OnInit {
     if (found) {
       const { id: _id, code, createdAt, updatedAt, ...rest } = found;
       this.d = { ...rest, rooms: [...rest.rooms] };
+      this.place = parsePlace(this.d.city);
+      this.placeLoaded = JSON.stringify(this.place);
+      this.placeUnmatched = !!this.d.city?.trim() && !formatPlace(this.place) ? this.d.city.trim() : '';
       // Reservas guardadas con el nombre completo en un solo campo: se sugiere la separación
       if (!this.d.lastName?.trim()) {
         [this.d.firstName, this.d.lastName] = splitFullName(this.d.guestName);
@@ -494,6 +565,9 @@ export class ReservationFormComponent implements OnInit {
       ...this.d,
       firstName: clean(this.d.firstName), lastName: clean(this.d.lastName),
       guestName: `${clean(this.d.firstName)} ${clean(this.d.lastName)}`,
+      // Si no se tocó el lugar, se conserva tal cual (registros viejos que no están en el catálogo)
+      city: JSON.stringify(this.place) === this.placeLoaded ? this.d.city : formatPlace(this.place),
+      plan: PLAN,
       adults: +this.d.adults, children: +this.d.children || 0, infants: +this.d.infants || 0,
       lodgingAmount: +this.d.lodgingAmount, extrasAmount: +this.d.extrasAmount || 0,
       status: this.autoStatus,

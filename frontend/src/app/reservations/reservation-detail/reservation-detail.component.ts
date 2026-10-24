@@ -145,7 +145,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
               <div><dt>{{ r.docType }}</dt><dd>{{ docNumber(r.docNumber) }}</dd></div>
               <div><dt>Correo electrónico</dt><dd>{{ r.email || '—' }}</dd></div>
               <div><dt>Teléfono</dt><dd>{{ r.phone }}</dd></div>
-              <div><dt>Ciudad / Departamento</dt><dd>{{ r.city || '—' }}</dd></div>
+              <div><dt>Lugar de residencia</dt><dd>{{ r.city || '—' }}</dd></div>
             </dl>
           </div>
         </section>
@@ -163,7 +163,6 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
                 <strong class="rd-lodging-name">{{ lodging(r) }}</strong>
                 <p><span>Capacidad máxima:</span> {{ capacity }} personas</p>
                 <p><span>Habitaciones:</span> {{ r.rooms.join(', ') }}</p>
-                <p><span>Plan / tarifa:</span> {{ r.plan }}</p>
               </div>
             </div>
             <div class="rd-rooms">

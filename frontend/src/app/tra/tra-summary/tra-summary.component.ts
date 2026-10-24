@@ -44,7 +44,7 @@ import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
   </div>
   <div class="tra-alert tra-alert--ok" *ngIf="v.ok && checkInReached">
     <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-    <div class="tra-alert-body"><strong>Todo correcto.</strong>Confirma el check-in para enviar la TRA al MinCIT.</div>
+    <div class="tra-alert-body"><strong>Todo correcto.</strong>{{ integration ? 'Confirma el check-in para enviar la TRA al MinCIT.' : 'Repórtala en la plataforma del MinCIT y registra aquí el número que te asignen.' }}</div>
   </div>
 
   <div class="tra-layout">
@@ -128,9 +128,10 @@ import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
 
       <div class="ts-actions">
         <button type="button" class="rsv-btn rsv-btn--primary rsv-btn--block" [disabled]="!canSend || sending" (click)="send()">
-          {{ sending ? 'Enviando al MinCIT…' : 'Confirmar check-in y enviar TRA' }}
+          {{ sending ? 'Enviando al MinCIT…' : integration ? 'Confirmar check-in y enviar TRA' : 'Continuar al reporte manual' }}
         </button>
         <p class="ts-hint" *ngIf="!v.ok">Corrige {{ v.issues.length }} problema{{ v.issues.length === 1 ? '' : 's' }} para habilitar el envío</p>
+        <p class="ts-hint" *ngIf="v.ok && checkInReached && !integration">Sin envío automático configurado: en el siguiente paso registras el número que te da la plataforma del MinCIT.</p>
         <p class="ts-hint" *ngIf="v.ok && !checkInReached">Se habilita el día del check-in ({{ date(r.checkIn) }})</p>
         <a class="rsv-btn rsv-btn--outline rsv-btn--block" [routerLink]="['/dashboard/tra', r.id, 'registro']">Corregir información</a>
       </div>
@@ -171,6 +172,7 @@ export class TraSummaryComponent {
   }
 
   get checkInReached(): boolean { return this.svc.checkInReached(this.r!); }
+  get integration(): boolean { return this.svc.getSettings().integrationActive; }
   get canSend(): boolean { return this.v!.ok && this.checkInReached; }
   get nights(): number { return nightsBetween(this.r!.checkIn, this.r!.checkOut); }
   get total(): number { return totalValue(this.rec!); }

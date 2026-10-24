@@ -1,15 +1,17 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ReservationService } from '../reservations/reservation.service';
 import { isoDate } from '../shared/date-utils';
 import { Reservation, lodgingLabel, isInHouse, awaitsCheckIn } from '../reservations/reservation.model';
 import { RoomService } from '../lodging/room.service';
 import { RoomStatus, RoomWithStatus } from '../lodging/room.model';
 import { InvoiceService } from '../billing/invoice.service';
-import { RestaurantService } from '../restaurant/restaurant.service';
 import { NotificationService } from '../notifications/notification.service';
 import { AppNotification } from '../notifications/notification.model';
+import { UsersService } from '../users/users.service';
+import { Module } from '../users/users.model';
 
 interface StatusCount { status: string; count: number; color: string; }
 interface DonutSegment { color: string; dasharray: string; dashoffset: number; }
@@ -25,6 +27,7 @@ interface AgendaItem {
   statusClass: string;
 }
 type AgendaTab = 'Todos' | 'Llegada' | 'Salida' | 'Limpieza' | 'Mantenimiento';
+interface QuickAction { label: string; link: string; module: Module; icon: string; }
 
 const ROOM_STATUS_COLORS: Record<RoomStatus, string> = {
   'Disponible':        '#23B57B',
@@ -44,308 +47,212 @@ const FLOOR_STATUS_ABBR: Record<RoomStatus, string> = {
   'Fuera de servicio': 'f. serv.',
 };
 
+/** Accesos rápidos: rutas reales; cada uno se muestra solo si el rol puede ver su módulo. */
+const QUICK_ACTIONS: QuickAction[] = [
+  { label: 'Nueva reserva',     link: '/dashboard/reservations/new', module: 'Reservas',     icon: 'M8 3v4M16 3v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM12 13v5M9.5 15.5h5' },
+  { label: 'Llegadas y salidas', link: '/dashboard/lodging/recepcion', module: 'Alojamiento',  icon: 'M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3' },
+  { label: 'Habitaciones',      link: '/dashboard/lodging',          module: 'Alojamiento',  icon: 'M2 20v-7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2M12 15v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v7M2 17h20' },
+  { label: 'Nueva factura',     link: '/dashboard/billing/new',      module: 'Facturación',  icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8' },
+  { label: 'Registrar ingreso', link: '/dashboard/accounting/income',  module: 'Contabilidad', icon: 'M12 19V5M5 12l7-7 7 7' },
+  { label: 'Registrar egreso',  link: '/dashboard/accounting/expense', module: 'Contabilidad', icon: 'M12 5v14M19 12l-7 7-7-7' },
+  { label: 'Inventario',        link: '/dashboard/inventory',        module: 'Inventarios',  icon: 'M4 8h16v12H4zM9 8V4h6v4M8 12h8M8 16h8' },
+];
+
 @Component({
   selector: 'app-dashboard-home',
   standalone: true,
   imports: [CommonModule, RouterLink],
   styleUrls: ['./dashboard-home.component.css'],
   template: `
-  <!-- KPIs: cada valor y desglose viene de un servicio real del sistema (reservas, alojamiento, facturación) -->
-  <section class="dash-stats">
-    <a routerLink="/dashboard/reservations" class="dash-stat-card dash-stat-card--green">
-      <svg class="dash-stat-watermark" viewBox="0 0 100 60"><path d="M0 60 L22 20 L34 38 L50 10 L72 42 L84 26 L100 60 Z"/></svg>
-      <div class="dash-stat-icon">
-        <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-      </div>
-      <span class="dash-stat-label">Llegadas próximas</span>
-      <span class="dash-stat-value">{{ arrivalsConfirmed + arrivalsPending }}</span>
-      <span class="dash-stat-detail">{{ arrivalsConfirmed }} confirmadas · {{ arrivalsPending }} pendientes</span>
-      <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+  <!-- Accesos rápidos -->
+  <nav class="dh-quick" aria-label="Accesos rápidos" *ngIf="quickActions.length">
+    <a *ngFor="let q of quickActions" [routerLink]="q.link" class="dh-quick-btn">
+      <svg viewBox="0 0 24 24"><path [attr.d]="q.icon"/></svg>{{ q.label }}
     </a>
+  </nav>
 
-    <a routerLink="/dashboard/lodging" class="dash-stat-card dash-stat-card--blue">
-      <svg class="dash-stat-watermark" viewBox="0 0 100 60"><path d="M0 60 L22 20 L34 38 L50 10 L72 42 L84 26 L100 60 Z"/></svg>
-      <div class="dash-stat-icon">
-        <svg viewBox="0 0 24 24"><path d="M16 17l5-5-5-5M21 12H9M9 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"/></svg>
-      </div>
-      <span class="dash-stat-label">Salidas próximas</span>
-      <span class="dash-stat-value">{{ departuresCount }}</span>
-      <span class="dash-stat-detail">{{ departuresToday }} hoy · {{ departuresLater }} más adelante</span>
-      <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+  <!-- Indicadores: cada valor viene de un servicio real (reservas, alojamiento, facturación) -->
+  <section class="dh-kpis">
+    <a routerLink="/dashboard/lodging" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--blue"><svg viewBox="0 0 24 24"><path d="M2 20v-7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2M12 15v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v7M2 17h20"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Ocupación</span>
+        <span class="dh-kpi-value">{{ occupancyPct }}%</span>
+        <span class="dh-kpi-bar"><span [style.width.%]="occupancyPct"></span></span>
+        <span class="dh-kpi-detail">{{ occupiedRooms }} de {{ rooms.length }} habitaciones</span>
+      </span>
     </a>
-
-    <a routerLink="/dashboard/lodging" class="dash-stat-card dash-stat-card--purple">
-      <svg class="dash-stat-watermark" viewBox="0 0 100 60"><path d="M0 60 L22 20 L34 38 L50 10 L72 42 L84 26 L100 60 Z"/></svg>
-      <div class="dash-stat-icon">
-        <svg viewBox="0 0 24 24"><path d="M2 20v-7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/><path d="M12 15v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v7"/><path d="M2 17h20"/><path d="M4 20v-3M20 20v-3"/></svg>
-      </div>
-      <span class="dash-stat-label">Habitaciones ocupadas</span>
-      <span class="dash-stat-value">{{ occupiedRooms }} <small>/ {{ rooms.length }}</small></span>
-      <span class="dash-stat-detail">{{ occupancyPct }}% de ocupación</span>
-      <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    <a routerLink="/dashboard/reservations" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--green"><svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Llegadas</span>
+        <span class="dh-kpi-value">{{ arrivalsToday }} <small>hoy</small></span>
+        <span class="dh-kpi-detail">{{ arrivalsConfirmed + arrivalsPending }} próximas · {{ arrivalsPending }} sin confirmar</span>
+      </span>
     </a>
-
-    <a routerLink="/dashboard/reservations" class="dash-stat-card dash-stat-card--teal">
-      <svg class="dash-stat-watermark" viewBox="0 0 100 60"><path d="M0 60 L22 20 L34 38 L50 10 L72 42 L84 26 L100 60 Z"/></svg>
-      <div class="dash-stat-icon">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      </div>
-      <span class="dash-stat-label">Reservas activas</span>
-      <span class="dash-stat-value">{{ activeReservations }}</span>
-      <span class="dash-stat-detail">{{ reservationsConfirmed }} confirmadas · {{ reservationsPending }} pendientes</span>
-      <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    <a routerLink="/dashboard/lodging" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--indigo"><svg viewBox="0 0 24 24"><path d="M16 17l5-5-5-5M21 12H9M9 19H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Salidas</span>
+        <span class="dh-kpi-value">{{ departuresToday }} <small>hoy</small></span>
+        <span class="dh-kpi-detail">{{ departuresCount }} huéspedes alojados</span>
+      </span>
     </a>
-
-    <a routerLink="/dashboard/billing" class="dash-stat-card dash-stat-card--amber">
-      <svg class="dash-stat-watermark" viewBox="0 0 100 60"><path d="M0 60 L22 20 L34 38 L50 10 L72 42 L84 26 L100 60 Z"/></svg>
-      <div class="dash-stat-icon">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-      </div>
-      <span class="dash-stat-label">Ingresos registrados</span>
-      <span class="dash-stat-value dash-stat-value--money">{{ formatMoney(invoiceStats.income) }}</span>
-      <span class="dash-stat-detail">{{ invoiceStats.paid }} facturas pagadas</span>
-      <svg class="dash-stat-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+    <a routerLink="/dashboard/reservations" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--teal"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Reservas activas</span>
+        <span class="dh-kpi-value">{{ activeReservations }}</span>
+        <span class="dh-kpi-detail">{{ reservationsConfirmed }} confirmadas · {{ reservationsPending }} pendientes</span>
+      </span>
+    </a>
+    <a routerLink="/dashboard/billing" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--amber"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Ingresos recibidos</span>
+        <span class="dh-kpi-value dh-kpi-value--money">{{ formatMoney(invoiceStats.income) }}</span>
+        <span class="dh-kpi-detail">{{ invoiceStats.paid }} facturas pagadas</span>
+      </span>
+    </a>
+    <a routerLink="/dashboard/billing" class="dh-kpi">
+      <span class="dh-kpi-icon dh-kpi-icon--red"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+      <span class="dh-kpi-body">
+        <span class="dh-kpi-label">Por cobrar</span>
+        <span class="dh-kpi-value dh-kpi-value--money">{{ formatMoney(invoiceStats.pendingAmount) }}</span>
+        <span class="dh-kpi-detail">{{ invoiceStats.pending }} facturas con saldo</span>
+      </span>
     </a>
   </section>
 
-  <section class="dash-row dash-row--rooms">
-    <article class="dash-card">
-      <div class="dash-card-header">
-        <h2 class="dash-card-title">
-          <span class="dash-card-title-icon">
-            <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 5-3 6-3 6h18s-3-1-3-6"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </span>
-          Alertas y pendientes
-        </h2>
-        <span class="dash-card-count" *ngIf="alerts.length">{{ alerts.length }}</span>
+  <!-- Operación del día -->
+  <section class="dh-row dh-row--ops">
+    <!-- Limpieza/mantenimiento no tienen fecha real (son estado actual de la habitación),
+         así que muestran "Ahora" en vez de una hora inventada. -->
+    <article class="dh-card">
+      <header class="dh-card-head">
+        <h2 class="dh-card-title">Agenda operativa</h2>
+        <a routerLink="/dashboard/lodging" class="dh-card-link">Ver alojamiento</a>
+      </header>
+      <div class="dh-tabs" role="tablist">
+        <button *ngFor="let t of tabs" type="button" role="tab" class="dh-tab" [class.active]="activeTab === t" [attr.aria-selected]="activeTab === t" (click)="activeTab = t">
+          {{ t === 'Todos' ? 'Todos' : t === 'Mantenimiento' ? 'Mant.' : t + 's' }}<span class="dh-tab-n">{{ countOf(t) }}</span>
+        </button>
       </div>
-      <ul class="dash-alert-list" *ngIf="alerts.length; else noAlerts">
-        <li class="dash-alert-row" *ngFor="let a of alerts">
-          <span class="dash-alert-icon" [ngClass]="'dash-alert-icon--' + a.icon">
-            <svg *ngIf="a.icon === 'checkout'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            <svg *ngIf="a.icon === 'cleaning'" viewBox="0 0 24 24"><path d="M3 21l7-7"/><path d="M12 9l-1.5-4.5a1 1 0 0 1 .5-1.2c1.8-.9 4.5-1 6 .5s1.4 4.2.5 6a1 1 0 0 1-1.2.5L12 9z"/></svg>
-            <svg *ngIf="a.icon === 'maintenance'" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            <svg *ngIf="a.icon === 'billing'" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <svg *ngIf="a.icon === 'review'" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            <svg *ngIf="a.icon === 'inventory'" viewBox="0 0 24 24"><path d="M4 8h16v12H4zM9 8V4h6v4M8 12h8M8 16h8"/></svg>
+      <ul class="dh-list dh-scroll" *ngIf="filteredAgenda.length; else noAgenda">
+        <li class="dh-agenda" *ngFor="let item of filteredAgenda">
+          <span class="dh-date" [class.dh-date--now]="!item.date">{{ formatShortDate(item.date) }}</span>
+          <span class="dh-type" [ngClass]="'dh-type--' + item.type">{{ item.type }}</span>
+          <span class="dh-item-text">
+            <span class="dh-item-title">{{ item.title }}</span>
+            <span class="dh-item-sub">{{ item.detail }}</span>
           </span>
-          <span class="dash-alert-text">
-            <span class="dash-alert-label">{{ a.label }}</span>
-            <span class="dash-alert-detail">{{ a.detail }}</span>
-          </span>
-          <span class="dash-priority" [ngClass]="'dash-priority--' + a.level">{{ a.level }}</span>
-          <a [routerLink]="a.link" class="dash-alert-link" aria-label="Ver detalle">›</a>
+          <span class="dh-badge" [ngClass]="item.statusClass">{{ item.status }}</span>
         </li>
       </ul>
-      <ng-template #noAlerts><p class="dash-empty">No hay alertas pendientes por el momento.</p></ng-template>
+      <ng-template #noAgenda><p class="dh-empty">No hay actividad para este filtro.</p></ng-template>
     </article>
 
-    <article class="dash-card dash-card--rooms">
-      <h2 class="dash-card-title">Estado de habitaciones</h2>
-      <div class="dash-rooms-grid">
-        <!-- Izquierda: la propiedad en general -->
-        <div class="dash-rooms-col">
-          <div class="dash-occ-wrap" *ngIf="rooms.length; else noRooms">
-            <div class="dash-donut-wrap">
-              <svg class="dash-donut" viewBox="0 0 120 120">
-                <circle cx="60" cy="60" r="44" fill="none" stroke="#E9EEF5" stroke-width="18" />
-                <circle *ngFor="let seg of roomDonutSegments" cx="60" cy="60" r="44" fill="none"
-                        [attr.stroke]="seg.color" stroke-width="18"
-                        [attr.stroke-dasharray]="seg.dasharray" [attr.stroke-dashoffset]="seg.dashoffset"
-                        transform="rotate(-90 60 60)"/>
-                <text x="60" y="58" text-anchor="middle" font-family="Poppins, sans-serif" font-size="22" font-weight="700" fill="#2B2B2B">{{ rooms.length }}</text>
-                <text x="60" y="76" text-anchor="middle" font-family="Poppins, sans-serif" font-size="10" fill="#7A7A7A">Habitaciones</text>
-              </svg>
-            </div>
-            <ul class="dash-occ-legend">
-              <li *ngFor="let s of roomStatusCounts">
-                <span class="dash-legend-dot" [style.background]="s.color"></span>
-                <span class="dash-legend-label">{{ s.status }}</span>
-                <strong>{{ s.count }}</strong>
-                <svg class="dash-legend-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
-              </li>
-            </ul>
-          </div>
-          <ng-template #noRooms><p class="dash-empty">No hay habitaciones registradas.</p></ng-template>
-        </div>
-
-        <!-- Derecha: desglose por piso -->
-        <div class="dash-rooms-col dash-rooms-col--floors">
-          <h3 class="dash-subcard-title">Por piso</h3>
-          <div class="dash-floor-block" *ngFor="let f of floors">
-            <div class="dash-floor-head">
-              <span class="dash-floor-name">Piso {{ f.floor }}</span>
-              <span class="dash-floor-count">{{ f.rooms.length }} habitaciones</span>
-            </div>
-            <div class="dash-floor-bar">
-              <span *ngFor="let seg of f.segments" [style.width.%]="seg.pct" [style.background]="seg.color"></span>
-            </div>
-            <p class="dash-floor-caption">{{ f.caption }}</p>
-          </div>
-        </div>
-      </div>
+    <article class="dh-card">
+      <header class="dh-card-head">
+        <h2 class="dh-card-title">Alertas y pendientes <span class="dh-count" *ngIf="alerts.length">{{ alerts.length }}</span></h2>
+      </header>
+      <ul class="dh-list dh-scroll" *ngIf="alerts.length; else noAlerts">
+        <li *ngFor="let a of alerts">
+          <a [routerLink]="a.link" class="dh-alert" [ngClass]="'dh-alert--' + a.level">
+            <span class="dh-item-text">
+              <span class="dh-item-title">{{ a.label }}</span>
+              <span class="dh-item-sub">{{ a.detail }}</span>
+            </span>
+            <span class="dh-priority" [ngClass]="'dh-priority--' + a.level">{{ a.level }}</span>
+            <svg class="dh-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+          </a>
+        </li>
+      </ul>
+      <ng-template #noAlerts>
+        <div class="dh-ok"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>Todo al día: no hay alertas pendientes.</div>
+      </ng-template>
     </article>
   </section>
 
-  <section class="dash-row dash-row--triple">
-    <!-- Agenda operativa: línea de tiempo. Limpieza/mantenimiento no tienen fecha real
-         (son estado actual de la habitación, no un evento agendado con hora), así que
-         muestran "Ahora" en vez de una hora inventada. -->
-    <article class="dash-card">
-      <div class="dash-card-header">
-        <h2 class="dash-card-title">
-          <span class="dash-card-title-icon dash-card-title-icon--blue">
-            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </span>
-          Agenda operativa
-        </h2>
-        <a routerLink="/dashboard/lodging" class="dash-card-link">Ver alojamiento →</a>
-      </div>
-      <div class="dash-tabs">
-        <button *ngFor="let t of tabs" class="dash-tab" [class.active]="activeTab === t" (click)="activeTab = t">{{ t }}</button>
-      </div>
-      <ul class="dash-timeline" *ngIf="filteredAgenda.length; else noAgenda">
-        <li class="dash-timeline-row" *ngFor="let item of filteredAgenda">
-          <div class="dash-timeline-when">
-            <span class="dash-timeline-dot" [ngClass]="'dash-timeline-dot--' + item.type"></span>
-            <span class="dash-timeline-date">{{ formatShortDate(item.date) }}</span>
+  <!-- Habitaciones · reservas · finanzas -->
+  <section class="dh-row dh-row--triple">
+    <article class="dh-card">
+      <header class="dh-card-head">
+        <h2 class="dh-card-title">Estado de habitaciones</h2>
+        <a routerLink="/dashboard/lodging" class="dh-card-link">Ver todas</a>
+      </header>
+      <ng-container *ngIf="rooms.length; else noRooms">
+        <div class="dh-occ">
+          <svg class="dh-donut" viewBox="0 0 120 120" role="img" [attr.aria-label]="occupiedRooms + ' de ' + rooms.length + ' habitaciones ocupadas'">
+            <circle cx="60" cy="60" r="46" fill="none" stroke="#EEF2F7" stroke-width="14" />
+            <circle *ngFor="let seg of roomDonutSegments" cx="60" cy="60" r="46" fill="none"
+                    [attr.stroke]="seg.color" stroke-width="14"
+                    [attr.stroke-dasharray]="seg.dasharray" [attr.stroke-dashoffset]="seg.dashoffset"
+                    transform="rotate(-90 60 60)"/>
+            <text x="60" y="60" text-anchor="middle" font-family="Poppins, sans-serif" font-size="24" font-weight="700" fill="#2B2B2B">{{ rooms.length }}</text>
+            <text x="60" y="77" text-anchor="middle" font-family="Poppins, sans-serif" font-size="10" fill="#7A7A7A">habitaciones</text>
+          </svg>
+          <ul class="dh-legend">
+            <li *ngFor="let s of roomStatusCounts">
+              <span class="dh-dot" [style.background]="s.color"></span>{{ s.status }}<strong>{{ s.count }}</strong>
+            </li>
+          </ul>
+        </div>
+        <div class="dh-floors">
+          <div class="dh-floor" *ngFor="let f of floors">
+            <div class="dh-floor-head"><strong>Piso {{ f.floor }}</strong><span>{{ f.caption }}</span></div>
+            <div class="dh-floor-bar"><span *ngFor="let seg of f.segments" [style.width.%]="seg.pct" [style.background]="seg.color"></span></div>
           </div>
-          <span class="dash-agenda-type" [ngClass]="'dash-agenda-type--' + item.type">{{ item.type }}</span>
-          <span class="dash-agenda-body">
-            <span class="dash-agenda-name">{{ item.title }}</span>
-            <span class="dash-agenda-detail">{{ item.detail }}</span>
-          </span>
-          <span class="dash-badge" [ngClass]="item.statusClass">{{ item.status }}</span>
+        </div>
+      </ng-container>
+      <ng-template #noRooms><p class="dh-empty">No hay habitaciones registradas.</p></ng-template>
+    </article>
+
+    <article class="dh-card">
+      <header class="dh-card-head">
+        <h2 class="dh-card-title">Reservas recientes</h2>
+        <a routerLink="/dashboard/reservations" class="dh-card-link">Ver todas</a>
+      </header>
+      <ul class="dh-list" *ngIf="recentReservations.length; else noRecent">
+        <li *ngFor="let r of recentReservations">
+          <a [routerLink]="['/dashboard/reservations', r.id]" class="dh-res">
+            <span class="dh-avatar">{{ initials(r.guestName) }}</span>
+            <span class="dh-item-text">
+              <span class="dh-item-title">{{ r.guestName }}</span>
+              <span class="dh-item-sub">{{ formatShortDate(r.checkIn) }} → {{ formatShortDate(r.checkOut) }} · {{ lodging(r) }}</span>
+            </span>
+            <span class="dh-badge" [ngClass]="badgeClass(r.status)">{{ r.status }}</span>
+          </a>
         </li>
       </ul>
-      <ng-template #noAgenda><p class="dash-empty">No hay actividad para este filtro.</p></ng-template>
+      <ng-template #noRecent><p class="dh-empty">No se encontraron reservas.</p></ng-template>
     </article>
 
-    <article class="dash-card">
-      <div class="dash-card-header">
-        <h2 class="dash-card-title">
-          <span class="dash-card-title-icon dash-card-title-icon--blue">
-            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </span>
-          Reservas recientes
-        </h2>
-        <a routerLink="/dashboard/reservations" class="dash-card-link">Ver todas →</a>
+    <article class="dh-card">
+      <header class="dh-card-head">
+        <h2 class="dh-card-title">Resumen financiero</h2>
+        <a routerLink="/dashboard/billing" class="dh-card-link">Ver facturación</a>
+      </header>
+      <div class="dh-fin-stats">
+        <div><span>Facturado</span><strong>{{ formatMoney(invoiceStats.income + invoiceStats.pendingAmount) }}</strong></div>
+        <div><span>Recibido</span><strong class="dh-pos">{{ formatMoney(invoiceStats.income) }}</strong></div>
+        <div><span>Por cobrar</span><strong [class.dh-neg]="invoiceStats.pendingAmount > 0">{{ formatMoney(invoiceStats.pendingAmount) }}</strong></div>
       </div>
-      <ul class="dash-reservation-list" *ngIf="recentReservations.length; else noRecent">
-        <li class="dash-reservation" *ngFor="let r of recentReservations">
-          <div class="dash-res-info">
-            <span class="dash-res-name">{{ r.guestName }}</span>
-            <span class="dash-res-room">{{ r.code }} · {{ lodging(r) }}</span>
-            <span class="dash-res-room">{{ formatShortDate(r.checkIn) }} → {{ formatShortDate(r.checkOut) }}</span>
-          </div>
-          <span class="dash-badge" [ngClass]="badgeClass(r.status)">{{ r.status }}</span>
-          <a [routerLink]="['/dashboard/reservations', r.id]" class="dash-alert-link" aria-label="Ver detalle">›</a>
-        </li>
-      </ul>
-      <ng-template #noRecent><p class="dash-empty">No se encontraron reservas.</p></ng-template>
-    </article>
-
-    <article class="dash-card">
-      <div class="dash-card-header">
-        <h2 class="dash-card-title">
-          <span class="dash-card-title-icon dash-card-title-icon--teal">
-            <svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-          </span>
-          Resumen financiero
-        </h2>
-        <a routerLink="/dashboard/billing" class="dash-card-link">Ver facturación →</a>
-      </div>
-
-      <div class="dash-finance-headline">
-        <span class="dash-finance-amount">{{ formatMoney(invoiceStats.income) }}</span>
-        <span class="dash-finance-label">Ingresos registrados</span>
-      </div>
-
-      <div class="dash-chart" *ngIf="incomeByDate.length; else noIncome">
-        <div class="dash-chart-bars">
-          <div class="dash-chart-col" *ngFor="let d of incomeByDate">
-            <div class="dash-chart-bar" [style.height.%]="chartHeight(d.amount)" [title]="formatMoney(d.amount)"></div>
-            <span class="dash-chart-label">{{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}</span>
+      <div class="dh-chart" *ngIf="recentIncome.length; else noIncome">
+        <div class="dh-chart-bars">
+          <div class="dh-chart-col" *ngFor="let d of recentIncome" [title]="formatShortDate(d.date) + ': ' + formatMoney(d.amount)">
+            <div class="dh-chart-bar" [style.height.%]="chartHeight(d.amount)"></div>
+            <span class="dh-chart-label">{{ d.date | slice:8:10 }}/{{ d.date | slice:5:7 }}</span>
           </div>
         </div>
-        <p class="dash-chart-caption">Ingresos por fecha de emisión de factura</p>
+        <p class="dh-chart-caption">Facturado por fecha de emisión · últimos {{ recentIncome.length }} días con facturas</p>
       </div>
-      <ng-template #noIncome><p class="dash-empty">No hay facturas pagadas registradas.</p></ng-template>
-
-      <div class="dash-mini-stats">
-        <div class="dash-mini-stat">
-          <span class="dash-mini-icon dash-mini-icon--purple">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          </span>
-          <span class="dash-mini-text">
-            <span class="dash-mini-label">Facturas emitidas</span>
-            <span class="dash-mini-value">{{ invoiceStats.total }}</span>
-          </span>
-        </div>
-        <div class="dash-mini-stat">
-          <span class="dash-mini-icon dash-mini-icon--green">
-            <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
-          </span>
-          <span class="dash-mini-text">
-            <span class="dash-mini-label">Facturas pagadas</span>
-            <span class="dash-mini-value">{{ invoiceStats.paid }}</span>
-          </span>
-        </div>
-        <div class="dash-mini-stat">
-          <span class="dash-mini-icon dash-mini-icon--amber">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </span>
-          <span class="dash-mini-text">
-            <span class="dash-mini-label">Pagos pendientes</span>
-            <span class="dash-mini-value">{{ formatMoney(invoiceStats.pendingAmount) }}</span>
-          </span>
-        </div>
-        <div class="dash-mini-stat">
-          <span class="dash-mini-icon dash-mini-icon--red">
-            <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-          </span>
-          <span class="dash-mini-text">
-            <span class="dash-mini-label">Ventas restaurante hoy</span>
-            <span class="dash-mini-value">{{ formatMoney(restaurantStats.sales) }}</span>
-          </span>
-        </div>
-      </div>
+      <ng-template #noIncome><p class="dh-empty">Aún no hay facturas emitidas.</p></ng-template>
     </article>
-  </section>
-
-  <!-- Acciones rápidas: enlazan a rutas reales ya existentes en el sistema -->
-  <section class="dash-card">
-    <h2 class="dash-card-title">Acciones rápidas</h2>
-    <div class="dash-quick-actions">
-      <a routerLink="/dashboard/reservations/new" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
-        Nueva reserva
-      </a>
-      <a routerLink="/dashboard/lodging/checkin" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-        Registrar check-in
-      </a>
-      <a routerLink="/dashboard/lodging" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><path d="M2 20v-7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/><path d="M12 15v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v7"/><path d="M2 17h20"/></svg>
-        Consultar habitaciones
-      </a>
-      <a routerLink="/dashboard/restaurant/room-charge" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/></svg>
-        Registrar consumo
-      </a>
-      <a routerLink="/dashboard/billing/new" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Generar factura
-      </a>
-      <a routerLink="/dashboard/inventory" class="dash-quick-action">
-        <svg viewBox="0 0 24 24"><path d="M4 8h16v12H4zM9 8V4h6v4M8 12h8M8 16h8"/></svg>
-        Consultar inventario
-      </a>
-    </div>
   </section>
   `
 })
-export class DashboardHomeComponent {
+export class DashboardHomeComponent implements OnDestroy {
   reservations: Reservation[] = [];
   rooms: RoomWithStatus[] = [];
 
@@ -353,8 +260,8 @@ export class DashboardHomeComponent {
   occupancyPct = 0;
   departuresCount = 0;
   departuresToday = 0;
-  departuresLater = 0;
   activeReservations = 0;
+  arrivalsToday = 0;
   arrivalsConfirmed = 0;
   arrivalsPending = 0;
   reservationsConfirmed = 0;
@@ -362,13 +269,13 @@ export class DashboardHomeComponent {
   readonly lodging = lodgingLabel;
 
   invoiceStats: ReturnType<InvoiceService['getStats']> = { total: 0, paid: 0, pending: 0, annulled: 0, rejected: 0, income: 0, pendingAmount: 0 };
-  restaurantStats: ReturnType<RestaurantService['getStats']> = { sales: 0, ordersToday: 0, openAccounts: 0, outOfStock: 0, lowStock: 0 };
-  incomeByDate: { date: string; amount: number }[] = [];
+  recentIncome: { date: string; amount: number }[] = [];
 
   recentReservations: Reservation[] = [];
   upcomingArrivals: Reservation[] = [];
   upcomingDepartures: Reservation[] = [];
   alerts: AppNotification[] = [];
+  readonly quickActions: QuickAction[];
 
   roomStatusCounts: StatusCount[] = [];
   roomDonutSegments: DonutSegment[] = [];
@@ -379,57 +286,70 @@ export class DashboardHomeComponent {
   activeTab: AgendaTab = 'Todos';
 
   private currencyFmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 });
+  private subs: Subscription[] = [];
 
   constructor(
     private reservationService: ReservationService,
     private roomService: RoomService,
     private invoiceService: InvoiceService,
-    private restaurantService: RestaurantService,
     private notificationService: NotificationService,
+    users: UsersService,
   ) {
-    this.reservationService.getAll().subscribe(list => {
+    this.quickActions = QUICK_ACTIONS.filter(q => users.can(q.module));
+
+    this.subs.push(this.reservationService.getAll().subscribe(list => {
       this.reservations = list;
       this.computeReservationDerived();
       this.computeAgenda();
-    });
+    }));
 
-    this.roomService.getAll().subscribe(list => {
+    this.subs.push(this.roomService.getAll().subscribe(list => {
       this.rooms = list;
       this.occupiedRooms = list.filter(r => r.status === 'Ocupada').length;
       this.occupancyPct = list.length ? Math.round((this.occupiedRooms / list.length) * 100) : 0;
       this.computeRoomDerived();
       this.computeAgenda();
-    });
+    }));
 
-    this.notificationService.getAll().subscribe(list => this.alerts = list);
+    this.subs.push(this.notificationService.getAll().subscribe(list => this.alerts = list));
 
-    this.invoiceStats = this.invoiceService.getStats();
-    this.incomeByDate = this.invoiceService.getIncomeByDate();
-    this.restaurantStats = this.restaurantService.getStats();
+    // Las facturas llegan del servidor después de abrir la página: se recalcula al cargar
+    this.subs.push(this.invoiceService.getAll().subscribe(() => {
+      this.invoiceStats = this.invoiceService.getStats();
+      this.recentIncome = this.invoiceService.getIncomeByDate().slice(-10);
+    }));
   }
+
+  ngOnDestroy(): void { this.subs.forEach(s => s.unsubscribe()); }
 
   formatMoney(value: number): string {
     return this.currencyFmt.format(value);
   }
 
   chartHeight(amount: number): number {
-    const max = Math.max(...this.incomeByDate.map(d => d.amount), 1);
-    return Math.max(6, (amount / max) * 100);
+    const max = Math.max(...this.recentIncome.map(d => d.amount), 1);
+    return Math.max(4, (amount / max) * 100);
+  }
+
+  initials(name: string): string {
+    return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
   }
 
   badgeClass(status: string): string {
     switch (status) {
-      case 'Confirmada':    return 'dash-badge--confirmed';
-      case 'Pendiente':     return 'dash-badge--waiting';
-      case 'Finalizada':    return 'dash-badge--finished';
+      case 'Confirmada':    return 'dh-badge--confirmed';
+      case 'Pendiente':     return 'dh-badge--waiting';
+      case 'Finalizada':    return 'dh-badge--finished';
       case 'Cancelada':
-      case 'No presentada': return 'dash-badge--cancelled';
-      default:              return 'dash-badge--pending';
+      case 'No presentada': return 'dh-badge--cancelled';
+      default:              return 'dh-badge--pending';
     }
   }
 
-  // La tarjeta tiene altura fija (igual a sus vecinas) y la lista hace scroll
-  // por dentro, así que "Todos" puede mostrar todo sin descuadrar la fila.
+  countOf(tab: AgendaTab): number {
+    return tab === 'Todos' ? this.agendaItems.length : this.agendaItems.filter(a => a.type === tab).length;
+  }
+
   get filteredAgenda(): AgendaItem[] {
     if (this.activeTab === 'Todos') return this.agendaItems;
     return this.agendaItems.filter(a => a.type === this.activeTab);
@@ -450,15 +370,15 @@ export class DashboardHomeComponent {
     const inHouse = this.reservations.filter(isInHouse).sort((a, b) => a.checkOut.localeCompare(b.checkOut));
     this.departuresCount = inHouse.length;
     this.departuresToday = inHouse.filter(r => r.checkOut <= today).length;
-    this.departuresLater = this.departuresCount - this.departuresToday;
-    this.upcomingDepartures = inHouse.slice(0, 4);
+    this.upcomingDepartures = inHouse.slice(0, 6);
 
     const allUpcomingArrivals = this.reservations.filter(r => awaitsCheckIn(r) && r.checkIn >= today);
+    this.arrivalsToday = allUpcomingArrivals.filter(r => r.checkIn === today).length;
     this.arrivalsConfirmed = allUpcomingArrivals.filter(r => r.status === 'Confirmada').length;
     this.arrivalsPending = allUpcomingArrivals.filter(r => r.status === 'Pendiente').length;
     this.upcomingArrivals = [...allUpcomingArrivals]
       .sort((a, b) => a.checkIn.localeCompare(b.checkIn))
-      .slice(0, 4);
+      .slice(0, 6);
   }
 
   private computeRoomDerived(): void {
@@ -469,7 +389,7 @@ export class DashboardHomeComponent {
       .filter(s => s.count > 0 || s.status === 'Disponible' || s.status === 'Ocupada');
 
     const total = this.rooms.length || 1;
-    const circumference = 2 * Math.PI * 44;
+    const circumference = 2 * Math.PI * 46;
     let cumulative = 0;
     this.roomDonutSegments = this.roomStatusCounts.filter(s => s.count > 0).map(s => {
       const dash = (s.count / total) * circumference;
@@ -515,27 +435,29 @@ export class DashboardHomeComponent {
       items.push({
         type: 'Salida', title: r.guestName,
         detail: `${lodgingLabel(r)}${floor ? ' · Piso ' + floor : ''}`,
-        date: r.checkOut, status: r.checkOut <= today ? 'Sale hoy' : 'En hospedaje', statusClass: 'dash-badge--checkout'
+        date: r.checkOut, status: r.checkOut <= today ? 'Sale hoy' : 'En hospedaje', statusClass: 'dh-badge--checkout'
       });
     });
     this.rooms.filter(r => r.status === 'En limpieza').forEach(r => {
       items.push({
         type: 'Limpieza', title: `Habitación ${r.number}`, detail: `Piso ${r.floor} · ${r.type}`,
-        date: '', status: 'En limpieza', statusClass: 'dash-badge--cleaning'
+        date: '', status: 'En limpieza', statusClass: 'dh-badge--cleaning'
       });
     });
     this.rooms.filter(r => r.status === 'En mantenimiento' || r.status === 'Fuera de servicio').forEach(r => {
       items.push({
         type: 'Mantenimiento', title: `Habitación ${r.number}`, detail: `Piso ${r.floor} · ${r.type}`,
-        date: '', status: r.status, statusClass: 'dash-badge--maintenance'
+        date: '', status: r.status, statusClass: 'dh-badge--maintenance'
       });
     });
 
-    this.agendaItems = items;
+    // Lo de ahora primero (limpieza/mantenimiento), luego por fecha
+    this.agendaItems = items.sort((a, b) => (a.date || '0').localeCompare(b.date || '0'));
   }
 
   formatShortDate(date: string): string {
     if (!date) return 'Ahora';
+    if (date === isoDate(0)) return 'Hoy';
     const [y, m, d] = date.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }).replace('.', '');
   }

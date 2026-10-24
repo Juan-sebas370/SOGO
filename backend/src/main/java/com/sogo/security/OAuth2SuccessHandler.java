@@ -35,10 +35,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
             throws IOException, ServletException {
         OAuth2AuthenticationToken token = (OAuth2AuthenticationToken) authentication;
-        String provider = token.getAuthorizedClientRegistrationId();
         OAuth2User principal = token.getPrincipal();
 
-        String email = extractEmail(provider, principal);
+        String email = extractEmail(principal);
         if (email == null || email.isBlank()) {
             response.sendRedirect(UriComponentsBuilder.fromUriString(frontendUrl + "/")
                     .queryParam("oauthError", "no-email")
@@ -46,11 +45,11 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        // La sesión de Google/Microsoft solo sirvió para comprobar el correo: SOGO usa su propio JWT
+        // La sesión de Google solo sirvió para comprobar el correo: SOGO usa su propio JWT
         var sesion = request.getSession(false);
         if (sesion != null) sesion.invalidate();
 
-        var ingreso = userService.authenticateOAuth(email, "google".equals(provider) ? "Google" : "Microsoft", request.getRemoteAddr());
+        var ingreso = userService.authenticateOAuth(email, "Google", request.getRemoteAddr());
         if (!ingreso.ok()) {
             String motivo = "no-registrado".equals(ingreso.motivo()) ? "not-registered" : ingreso.motivo();
             response.sendRedirect(UriComponentsBuilder.fromUriString(frontendUrl + "/")
@@ -71,17 +70,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         response.sendRedirect(redirect);
     }
 
-    private String extractEmail(String provider, OAuth2User principal) {
-        if (principal instanceof OidcUser oidcUser) {
-            // Google (OIDC): the id_token carries a verified "email" claim.
-            return oidcUser.getEmail();
-        }
-        // Microsoft via Graph /me is not OIDC here (see application.properties): no "email" claim,
-        // fall back to mail, then userPrincipalName (always present, usually the sign-in email).
-        Object mail = principal.getAttributes().get("mail");
-        if (mail != null) return mail.toString();
-        Object upn = principal.getAttributes().get("userPrincipalName");
-        return upn != null ? upn.toString() : null;
+    private String extractEmail(OAuth2User principal) {
+        // Google (OIDC): the id_token carries a verified "email" claim.
+        return principal instanceof OidcUser oidcUser ? oidcUser.getEmail() : null;
     }
 
     private String encode(String value) {

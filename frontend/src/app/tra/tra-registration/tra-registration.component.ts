@@ -56,6 +56,17 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
     <div class="tra-alert-actions"><a class="rsv-btn rsv-btn--outline rsv-btn--sm" [routerLink]="['/dashboard/tra', r.id]">Ver trazabilidad</a></div>
   </div>
 
+  <div class="tra-alert tra-alert--danger" *ngIf="blockers.length" role="alert">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+    <div class="tra-alert-body">
+      <strong>La TRA aún no queda lista: {{ blockers.length }} cosa{{ blockers.length === 1 ? '' : 's' }} por resolver</strong>
+      <ul class="tr-blockers"><li *ngFor="let b of blockers">{{ b }}</li></ul>
+    </div>
+    <div class="tra-alert-actions" *ngIf="configBlocker">
+      <a class="rsv-btn rsv-btn--outline rsv-btn--sm" routerLink="/dashboard/tra/config">Ir a Configuración TRA</a>
+    </div>
+  </div>
+
   <div class="tra-alert tra-alert--ok" *ngIf="savedAt">
     <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
     <div class="tra-alert-body">Guardado en la base de datos a las {{ savedAt }} (se guarda solo mientras escribes). La TRA se reporta al confirmar el check-in.</div>
@@ -562,9 +573,27 @@ export class TraRegistrationComponent implements OnDestroy {
     this.savedAt = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
   }
 
+  /** Problemas que impiden dejar la TRA lista (se muestran arriba del registro). */
+  blockers: string[] = [];
+  get configBlocker(): boolean { return this.blockers.some(b => /RNT|Configuración TRA/.test(b)); }
+
   validateAndContinue(): void {
-    this.save();
-    this.svc.markValidated(this.rec!.reservationId);
-    this.router.navigate(['/dashboard/tra', this.rec!.reservationId, 'resumen']);
+    try {
+      this.save();
+      const v = this.svc.markValidated(this.rec!.reservationId);
+      if (v && !v.ok) {
+        // Antes se pasaba al resumen igual y parecía que no avanzaba: se queda aquí diciendo qué falta
+        this.blockers = v.issues.map(i => i.message);
+        this.showErrors = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      this.blockers = [];
+      this.router.navigate(['/dashboard/tra', this.rec!.reservationId, 'resumen']);
+    } catch (e) {
+      console.error('No se pudo validar la TRA', e);
+      this.blockers = ['No se pudo validar la TRA por un error inesperado. Recarga la página e inténtalo de nuevo; si sigue, avísale al administrador.'];
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 }

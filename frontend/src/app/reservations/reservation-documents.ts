@@ -17,12 +17,12 @@ export function openConfirmation(r: Reservation, print = false): void {
   const rows = (pairs: [string, unknown][]) => pairs.map(([k, v]) => `<tr><th style="width:38%">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('');
   openDocument(`Reserva ${r.code}`, `${header('Confirmación de reserva', r)}
   <h2>Cliente</h2><table>${rows([
-    ['Nombre', r.guestName], [r.docType, r.docNumber], ['Teléfono', r.phone], ['Correo', r.email], ['Ciudad / Departamento', r.city],
+    ['Nombre', r.guestName], [r.docType, r.docNumber], ['Teléfono', r.phone], ['Correo', r.email], ['Lugar de residencia', r.city],
   ])}</table>
   <h2>Reserva</h2><table>${rows([
     ['Estado', r.status], ['Tipo de reserva', r.reservationType], ['Alojamiento', lodgingLabel(r)], ['Habitaciones', roomsLabel(r)],
     ['Entrada', fmtDate(r.checkIn)], ['Salida', fmtDate(r.checkOut)], ['Noches', r.nights || 'Pasadía'],
-    ['Huéspedes', `${totalGuests(r)} (${r.adults} adultos · ${r.children} niños · ${r.infants} bebés)`], ['Plan / tarifa', r.plan],
+    ['Huéspedes', `${totalGuests(r)} (${r.adults} adultos · ${r.children} niños · ${r.infants} bebés)`],
   ])}</table>
   <h2>Valores</h2><table>${rows([
     ['Total', fmtMoney(totalAmount(r))], ['Pagado', fmtMoney(paidAmount(r))], ['Saldo pendiente', fmtMoney(balance(r))], ['Estado del pago', paymentStatus(r)],

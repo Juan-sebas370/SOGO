@@ -13,7 +13,7 @@ import {
 // ── Huéspedes ──────────────────────────────────────────
 export const principalOf  = (rec: TraRecord): TraGuest => rec.guests[0];
 export const companionsOf = (rec: TraRecord): TraGuest[] => rec.guests.slice(1);
-export const fullName     = (g: TraGuest): string => `${g.firstNames} ${g.lastNames}`.trim();
+export const fullName     = (g: TraGuest): string => `${g.firstNames ?? ''} ${g.lastNames ?? ''}`.trim();
 
 /** RN-03: residencia, procedencia, motivo y fechas se heredan del principal salvo que el acompañante tenga los suyos. */
 export function travelOf(rec: TraRecord, g: TraGuest): TravelData {
@@ -54,9 +54,9 @@ export function guestIssues(rec: TraRecord, g: TraGuest): string[] {
   const of = who(rec, g);
   const out: string[] = [];
   if (!g.docType)            out.push(`Falta tipo de documento ${of}`);
-  if (!g.docNumber.trim())   out.push(`Falta número de documento ${of}`);
-  if (!g.firstNames.trim())  out.push(`Faltan nombres ${of}`);
-  if (!g.lastNames.trim())   out.push(`Faltan apellidos ${of}`);
+  if (!(g.docNumber ?? '').trim())   out.push(`Falta número de documento ${of}`);
+  if (!(g.firstNames ?? '').trim())  out.push(`Faltan nombres ${of}`);
+  if (!(g.lastNames ?? '').trim())   out.push(`Faltan apellidos ${of}`);
   if (inherits(g)) return out;
 
   const t = g.travel;
@@ -73,7 +73,7 @@ export const isComplete = (rec: TraRecord, g: TraGuest): boolean => guestIssues(
 export function principalFieldsDone(rec: TraRecord): number {
   const g = principalOf(rec);
   const t = g.travel;
-  return [g.docType, g.docNumber.trim(), g.firstNames.trim(), g.lastNames.trim(), t.residenceCountry, t.residenceCity,
+  return [g.docType, (g.docNumber ?? '').trim(), (g.firstNames ?? '').trim(), (g.lastNames ?? '').trim(), t.residenceCountry, t.residenceCity,
     t.originCountry, t.originCity, t.reasonId, t.checkIn && t.checkOut].filter(Boolean).length;
 }
 
@@ -116,7 +116,7 @@ export function validate(rec: TraRecord, r: Reservation, settings: TraSettings, 
   const unitOf = (id: string) => units.find(u => u.id === id);
 
   // 1–2. Integración
-  const rnt = !!settings.rnt.trim();
+  const rnt = !!(settings.rnt ?? '').trim();
   const token = !!settings.tokenLast4 && settings.integrationActive;
   if (!rnt) issues.push({ message: 'El RNT no está configurado (Configuración TRA)' });
 
@@ -165,7 +165,7 @@ export function validate(rec: TraRecord, r: Reservation, settings: TraSettings, 
 
   const checks: Check[] = [
     { label: 'RNT configurado', ok: rnt, detail: rnt ? `${settings.provider} · RNT ${settings.rnt}` : 'Configúralo en Configuración TRA' },
-    { label: 'Token PMS configurado', ok: token, detail: token ? `Última prueba de conexión: ${settings.lastSync.replace('T', ' ').slice(0, 16)}` : 'Sin token activo' },
+    { label: 'Token PMS configurado', ok: token, detail: token ? `Última prueba de conexión: ${(settings.lastSync ?? '').replace('T', ' ').slice(0, 16)}` : 'Sin token activo' },
     { label: 'Huésped principal completo', ok: !principalIssues.length, detail: `${fullName(principal) || 'Sin nombre'} · ${principalFieldsDone(rec)} de 10 campos` },
     { label: 'Acompañantes completos', ok: companionsOk,
       detail: expectedCompanions === 0 ? 'La reserva no tiene acompañantes'
@@ -180,7 +180,9 @@ export function validate(rec: TraRecord, r: Reservation, settings: TraSettings, 
     { label: 'Códigos de catálogo válidos', ok: codesOk, detail: codesOk ? 'Documento, país, ciudad, motivo y acomodación' : 'Revisa los catálogos' },
   ];
   const passed = checks.filter(c => c.ok).length;
-  return { checks, issues, passed, ok: passed === checks.length };
+  // El token es informativo: sin envío automático la TRA se reporta a mano en la plataforma del
+  // MinCIT (detalle de la TRA), así que no impide que quede lista. Bloquea solo lo que tiene mensaje.
+  return { checks, issues, passed, ok: issues.length === 0 };
 }
 
 // ── Borrador a partir de la reserva ────────────────────

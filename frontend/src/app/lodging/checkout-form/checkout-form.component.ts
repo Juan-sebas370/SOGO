@@ -32,7 +32,7 @@ interface DamageLine {
   template: `
   <nav class="lod-breadcrumb" aria-label="Ruta">
     <a routerLink="/dashboard">Dashboard</a><span aria-hidden="true">›</span>
-    <a routerLink="/dashboard/lodging">Alojamiento</a><span aria-hidden="true">›</span><span>Check-Out</span>
+    <a routerLink="/dashboard/lodging">Alojamiento</a><span aria-hidden="true">›</span><a routerLink="/dashboard/lodging/recepcion">Llegadas y salidas</a><span aria-hidden="true">›</span><span>Check-out</span>
   </nav>
   <h1 class="flow-title">Registrar check-out</h1>
   <p class="flow-subtitle">Liquida la estadía y libera las habitaciones.</p>
@@ -159,7 +159,7 @@ interface DamageLine {
   <div class="flow-error" *ngIf="errorMsg" role="alert">{{ errorMsg }}</div>
 
   <div class="flow-footer">
-    <a class="rsv-btn rsv-btn--outline" routerLink="/dashboard/lodging">Cancelar</a>
+    <a class="rsv-btn rsv-btn--outline" routerLink="/dashboard/lodging/recepcion">Cancelar</a>
     <button type="button" class="rsv-btn rsv-btn--primary" *ngIf="r" (click)="confirm()">
       {{ due > 0 ? 'Cobrar ' + money(due) + ' y registrar salida' : 'Registrar check-out' }}
     </button>

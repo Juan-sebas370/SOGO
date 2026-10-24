@@ -138,7 +138,8 @@ export const routes: Routes = [
       { path: 'lodging',                        component: LodgingListComponent },
       { path: 'lodging/rates',                  loadComponent: () => import('./lodging/rates/rates.component').then(c => c.RatesComponent) },
       // :id = id de la reserva (la estadía es parte de la reserva)
-      { path: 'lodging/checkin',                component: CheckinFormComponent },
+      { path: 'lodging/recepcion',              loadComponent: () => import('./lodging/front-desk/front-desk.component').then(c => c.FrontDeskComponent) },
+      { path: 'lodging/checkin',                redirectTo: 'lodging/recepcion', pathMatch: 'full' },
       { path: 'lodging/:id/checkin',            component: CheckinFormComponent },
       { path: 'lodging/:id/checkin-confirm',    component: LodgingConfirmComponent, data: { kind: 'checkin' } },
       { path: 'lodging/:id/checkout',           component: CheckoutFormComponent },

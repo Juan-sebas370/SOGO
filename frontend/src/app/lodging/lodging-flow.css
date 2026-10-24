@@ -70,6 +70,8 @@
 }
 
 .flow-alert a { margin-left: 6px; color: #0B6FD0; font-weight: 600; }
+.flow-alert .ci-issues { margin: 6px 0; padding-left: 18px; }
+.flow-alert .ci-issues + a { margin-left: 0; }
 
 .flow-lines {
   margin-top: 14px;

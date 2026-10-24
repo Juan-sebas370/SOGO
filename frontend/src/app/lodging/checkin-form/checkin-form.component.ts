@@ -19,25 +19,10 @@ import { isoDate, isoDateTime } from '../../shared/date-utils';
   template: `
   <nav class="lod-breadcrumb" aria-label="Ruta">
     <a routerLink="/dashboard">Dashboard</a><span aria-hidden="true">›</span>
-    <a routerLink="/dashboard/lodging">Alojamiento</a><span aria-hidden="true">›</span><span>Check-In</span>
+    <a routerLink="/dashboard/lodging">Alojamiento</a><span aria-hidden="true">›</span><a routerLink="/dashboard/lodging/recepcion">Llegadas y salidas</a><span aria-hidden="true">›</span><span>Check-in</span>
   </nav>
   <h1 class="flow-title">Registrar check-in</h1>
   <p class="flow-subtitle">Confirma la llegada del huésped y los datos con los que se aloja.</p>
-
-  <!-- Sin reserva elegida: llegadas pendientes de hoy -->
-  <section class="rsv-panel flow-card flow-picker" *ngIf="!r">
-    <h2 class="flow-card-title">Llegadas pendientes</h2>
-    <ul class="flow-arrivals" *ngIf="arrivals.length; else noArrivals">
-      <li *ngFor="let a of arrivals">
-        <div>
-          <strong>{{ a.guestName }}</strong>
-          <span>{{ a.code }} · {{ lodging(a) }} · {{ date(a.checkIn) }} - {{ date(a.checkOut) }}</span>
-        </div>
-        <a class="rsv-btn rsv-btn--primary" [routerLink]="['/dashboard/lodging', a.id, 'checkin']">Registrar</a>
-      </li>
-    </ul>
-    <ng-template #noArrivals><p class="flow-empty">No hay reservas esperando check-in hoy.</p></ng-template>
-  </section>
 
   <div class="flow-grid" *ngIf="r">
     <section class="rsv-panel flow-card">
@@ -47,14 +32,15 @@ import { isoDate, isoDateTime } from '../../shared/date-utils';
         <div><dt>Huésped principal</dt><dd>{{ r.guestName }}</dd></div>
         <div><dt>Alojamiento</dt><dd>{{ lodging(r) }} · hab. {{ r.rooms.join(', ') }}</dd></div>
         <div><dt>Entrada - Salida</dt><dd>{{ date(r.checkIn) }} - {{ date(r.checkOut) }}</dd></div>
-        <div><dt>Plan / tarifa</dt><dd>{{ r.plan }}</dd></div>
         <div><dt>Saldo pendiente</dt><dd [class.flow-warn-text]="pending > 0">{{ money(pending) }}</dd></div>
-        <div><dt>TRA</dt><dd>{{ traLabel(tra) }}</dd></div>
+        <div><dt>TRA</dt><dd>{{ tra === 'BORRADOR' && traReady ? 'Lista para envío' : traLabel(tra) }}</dd></div>
       </dl>
-      <p class="flow-alert" *ngIf="tra === 'BORRADOR' || tra === 'REQUIERE_CORRECCION'">
-        La TRA de esta reserva aún no está lista para envío.
+      <div class="flow-alert" *ngIf="!traReady">
+        La TRA de esta reserva aún no está lista para envío<ng-container *ngIf="traIssues.length">. Falta:</ng-container>
+        <ul class="ci-issues" *ngIf="traIssues.length"><li *ngFor="let i of traIssues">{{ i }}</li></ul>
         <a [routerLink]="['/dashboard/tra', r.id, 'registro']">Completar TRA</a>
-      </p>
+        <a *ngIf="traConfigIssue" routerLink="/dashboard/tra/config">Configuración TRA</a>
+      </div>
       <p class="flow-alert" *ngIf="cleaningRooms.length">
         Habitación{{ cleaningRooms.length > 1 ? 'es' : '' }} {{ cleaningRooms.join(', ') }} en limpieza: al confirmar quedará{{ cleaningRooms.length > 1 ? 'n' : '' }} ocupada{{ cleaningRooms.length > 1 ? 's' : '' }}.
       </p>
@@ -99,11 +85,11 @@ import { isoDate, isoDateTime } from '../../shared/date-utils';
 
   <div class="flow-error" *ngIf="errorMsg" role="alert">{{ errorMsg }}</div>
 
-  <div class="flow-footer">
-    <a class="rsv-btn rsv-btn--outline" routerLink="/dashboard/lodging">Cancelar</a>
-    <button type="button" class="rsv-btn rsv-btn--primary" *ngIf="r" (click)="confirm()">Confirmar check-in</button>
+  <div class="flow-footer" *ngIf="r">
+    <a class="rsv-btn rsv-btn--outline" routerLink="/dashboard/lodging/recepcion">Cancelar</a>
+    <button type="button" class="rsv-btn rsv-btn--primary" (click)="confirm()">Confirmar check-in</button>
   </div>
-  `
+  `,
 })
 export class CheckinFormComponent {
 
@@ -112,7 +98,6 @@ export class CheckinFormComponent {
   readonly lodging = lodgingLabel;
 
   r?: Reservation;
-  arrivals: Reservation[] = [];
   errorMsg = '';
 
   form = { date: isoDate(0), time: isoDateTime().slice(11, 16), docNumber: '', adults: 1, children: 0, infants: 0, observations: '' };
@@ -126,21 +111,19 @@ export class CheckinFormComponent {
     route: ActivatedRoute
   ) {
     const id = route.snapshot.paramMap.get('id');
-    const today = isoDate(0);
-    if (!id) {
-      this.arrivals = this.svc.getSnapshot()
-        .filter(r => awaitsCheckIn(r) && r.checkIn <= today && r.checkOut >= today)
-        .sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-      return;
-    }
-    const r = this.svc.getById(id);
-    if (!r || !awaitsCheckIn(r)) { this.router.navigate(['/dashboard/lodging']); return; }
+    const r = id ? this.svc.getById(id) : undefined;
+    // Sin reserva elegida (o ya no espera llegada): a Llegadas y salidas, donde se escoge
+    if (!r || !awaitsCheckIn(r)) { this.router.navigate(['/dashboard/lodging/recepcion']); return; }
     this.r = r;
     this.form = { ...this.form, docNumber: r.docNumber, adults: r.adults, children: r.children, infants: r.infants, observations: r.observations };
   }
 
   get pending(): number { return balance(this.r!); }
   get tra() { return this.traSvc.statusOf(this.r!); }
+  get traReady(): boolean { return this.traSvc.isReadyForCheckIn(this.r!); }
+  /** Lo que le falta a la TRA, dicho tal cual (antes solo decía "no está lista"). */
+  get traIssues(): string[] { return this.traSvc.validation(this.r!.id)?.issues.map(i => i.message) ?? []; }
+  get traConfigIssue(): boolean { return this.traIssues.some(i => /RNT|Configuración TRA/.test(i)); }
   readonly traLabel = traLabel;
 
   get cleaningRooms(): string[] {
@@ -153,7 +136,7 @@ export class CheckinFormComponent {
     if (!this.form.docNumber.trim()) return 'Confirma el documento del huésped principal.';
     if ((+this.form.adults || 0) < 1) return 'Debe haber al menos un adulto.';
     // Configuración › Alojamiento: «Exigir TRA en el check-in»
-    if (this.settings.policies.requireTra && (this.tra === 'BORRADOR' || this.tra === 'REQUIERE_CORRECCION')) return 'La política del hospedaje exige la TRA lista antes del check-in: complétala primero.';
+    if (this.settings.policies.requireTra && !this.traReady) return 'La política del hospedaje exige la TRA lista antes del check-in: complétala primero.';
 
     const rooms = this.roomSvc.getSnapshot().filter(room => r.rooms.includes(room.number));
     const blocked = rooms.filter(room => room.status === 'En mantenimiento' || room.status === 'Fuera de servicio');

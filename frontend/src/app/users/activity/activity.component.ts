@@ -39,13 +39,22 @@ const PAGE = 20;
     <div class="kit-actions"><button type="button" class="rsv-btn rsv-btn--outline" [disabled]="!rows.length || !canExport" (click)="export()">Exportar</button></div>
   </header>
 
-  <section class="kit-card rp-filters ac-filters">
-    <label class="kit-select"><span>Usuario</span><select [(ngModel)]="f.user" (ngModelChange)="page = 0"><option value="">Todos</option><option *ngFor="let u of userOptions">{{ u }}</option></select></label>
-    <label class="kit-select"><span>Módulo</span><select [(ngModel)]="f.module" (ngModelChange)="page = 0"><option value="">Todos</option><option *ngFor="let m of moduleOptions">{{ m }}</option></select></label>
-    <label class="kit-select"><span>Tipo de acción</span><select [(ngModel)]="f.type" (ngModelChange)="page = 0"><option value="">Todas</option><option *ngFor="let t of types">{{ t }}</option></select></label>
-    <label class="kit-select"><span>Resultado</span><select [(ngModel)]="f.result" (ngModelChange)="page = 0"><option value="">Todos</option><option>Exitoso</option><option>Denegado</option><option>Fallido</option></select></label>
-    <label class="kit-select"><span>Desde</span><input type="date" [(ngModel)]="f.from" [max]="f.to" (ngModelChange)="page = 0"></label>
-    <label class="kit-select"><span>Hasta</span><input type="date" [(ngModel)]="f.to" [min]="f.from" (ngModelChange)="page = 0"></label>
+  <section class="kit-card ac-filters">
+    <div class="ac-filters-head">
+      <h2 class="kit-card-title">Filtros <span class="ac-count" *ngIf="activeFilters">{{ activeFilters }}</span></h2>
+      <div class="ac-ranges" role="group" aria-label="Rango rápido">
+        <button type="button" *ngFor="let r of ranges" [class.on]="isRange(r.days)" (click)="setRange(r.days)">{{ r.label }}</button>
+      </div>
+      <button type="button" class="ac-clear" [disabled]="!activeFilters && isRange(6)" (click)="clear()">Limpiar filtros</button>
+    </div>
+    <div class="ac-filters-grid">
+      <label class="kit-select"><span>Usuario</span><select [(ngModel)]="f.user" (ngModelChange)="page = 0"><option value="">Todos</option><option *ngFor="let u of userOptions">{{ u }}</option></select></label>
+      <label class="kit-select"><span>Módulo</span><select [(ngModel)]="f.module" (ngModelChange)="page = 0"><option value="">Todos</option><option *ngFor="let m of moduleOptions">{{ m }}</option></select></label>
+      <label class="kit-select"><span>Tipo de acción</span><select [(ngModel)]="f.type" (ngModelChange)="page = 0"><option value="">Todas</option><option *ngFor="let t of types">{{ t }}</option></select></label>
+      <label class="kit-select"><span>Resultado</span><select [(ngModel)]="f.result" (ngModelChange)="page = 0"><option value="">Todos</option><option>Exitoso</option><option>Denegado</option><option>Fallido</option></select></label>
+      <label class="kit-select"><span>Desde</span><input type="date" [(ngModel)]="f.from" [max]="f.to" (ngModelChange)="page = 0"></label>
+      <label class="kit-select"><span>Hasta</span><input type="date" [(ngModel)]="f.to" [min]="f.from" (ngModelChange)="page = 0"></label>
+    </div>
   </section>
 
   <div class="kit-banner kit-banner--warn" *ngFor="let x of unusual">
@@ -98,7 +107,21 @@ const PAGE = 20;
   </div>
   `,
   styles: [`
-    .ac-filters .kit-select { min-width: 120px; }
+    .ac-filters { margin-bottom: 16px; }
+    .ac-filters-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .ac-filters-head .kit-card-title { margin: 0; display: flex; align-items: center; gap: 8px; }
+    .ac-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #1565C0; color: #fff; font-size: 11px; font-weight: 700; }
+    .ac-ranges { display: inline-flex; gap: 4px; padding: 3px; margin-left: auto; border-radius: 10px; background: #F1F4F9; }
+    .ac-ranges button { height: 28px; padding: 0 12px; border: none; border-radius: 8px; background: transparent; font: inherit; font-size: 12.5px; color: #4B5563; cursor: pointer; }
+    .ac-ranges button:hover { color: #0A2540; }
+    .ac-ranges button.on { background: #fff; color: #1565C0; font-weight: 600; box-shadow: 0 1px 3px rgba(10, 37, 64, .12); }
+    .ac-clear { height: 34px; padding: 0 12px; border: 1px solid #D5DEEA; border-radius: 8px; background: #fff; font: inherit; font-size: 12.5px; color: #1565C0; cursor: pointer; }
+    .ac-clear:disabled { color: #9CA3AF; cursor: default; }
+    .ac-filters-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+    .ac-filters-grid .kit-select { min-width: 0; }
+    .ac-filters-grid select, .ac-filters-grid input { width: 100%; text-overflow: ellipsis; }
+    @media (max-width: 1280px) { .ac-filters-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 640px) { .ac-filters-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ac-ranges { margin-left: 0; } }
     .kit-banner .rsv-btn { flex-shrink: 0; background: #fff; }
     .ac-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
     .ac-table tbody tr { cursor: pointer; }
@@ -144,6 +167,13 @@ export class ActivityComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void { this.sub.unsubscribe(); }
+
+  readonly ranges = [{ label: 'Hoy', days: 0 }, { label: '7 días', days: 6 }, { label: '30 días', days: 29 }, { label: '90 días', days: 89 }];
+  isRange(days: number): boolean { return this.f.from === dayOffset(-days) && this.f.to === dayOffset(0); }
+  setRange(days: number): void { this.f = { ...this.f, from: dayOffset(-days), to: dayOffset(0) }; this.page = 0; }
+  /** Filtros distintos de "Todos" (las fechas no cuentan: siempre hay un rango). */
+  get activeFilters(): number { return [this.f.user, this.f.module, this.f.type, this.f.result].filter(Boolean).length; }
+  clear(): void { this.f = { user: '', module: '', type: '', result: '', from: dayOffset(-6), to: dayOffset(0) }; this.page = 0; }
 
   get canExport(): boolean { return this.svc.can('Usuarios', 'export'); }
   get rows(): AuditEvent[] {

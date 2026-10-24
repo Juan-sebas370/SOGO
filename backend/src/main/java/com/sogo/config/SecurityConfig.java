@@ -22,7 +22,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 
-        // Only enable social login once at least one provider (Google/Azure) has real credentials
+        // Only enable social login once Google has real credentials
         // configured (see OAuth2ClientConfig) - otherwise there's no ClientRegistrationRepository bean.
         if (clientRegistrations.getIfAvailable() != null) {
             http.oauth2Login(oauth2 -> oauth2.successHandler(oAuth2SuccessHandler));

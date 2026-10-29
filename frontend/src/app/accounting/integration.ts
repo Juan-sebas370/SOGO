@@ -14,6 +14,7 @@ import { Invoice, InvoiceLine, isValidInvoice, lineNet, computeTotals } from '..
 import { Charge } from '../billing/charge.service';
 import { PayLine, PayrollRun, extrasTotal, transportOf, bonusTotal, legalDeductions, periodLabel } from '../payroll/payroll.model';
 import { Movement, Product } from '../inventory/inventory.model';
+import { parsePlace, isColombia } from '../shared/colombia';
 
 export interface ModuleData {
   reservations: Reservation[];
@@ -89,7 +90,7 @@ export function buildIntegration(d: ModuleData, from: string, today: string): In
 
     // Causación de la estadía al check-out (alojamiento o pasadía + otros servicios sin consumo registrado)
     if (stayAt && inRange(stayAt.slice(0, 10))) {
-      const foreign = r.docType === 'Pasaporte' && !r.city.startsWith('Colombia');
+      const foreign = r.docType === 'Pasaporte' && !isColombia(parsePlace(r.city).country);
       const category = r.nights === 0 ? 'Eventos y pasadías' : 'Alojamiento';
       const tax = d.taxFor(category, foreign);
       const lodging = round(r.lodgingAmount), lodgingTax = round(lodging * tax.rate);

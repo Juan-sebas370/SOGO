@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -24,10 +25,10 @@ interface Report {
 @Component({
   selector: 'app-reports-general',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, DeltaComponent],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink, DeltaComponent],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Reporte general</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Reporte general del hospedaje</h1>
@@ -41,133 +42,172 @@ interface Report {
   </header>
   <p class="kit-banner kit-banner--info" *ngIf="!canExport">Tu rol puede consultar los reportes pero no exportarlos.</p>
 
-  <div class="gr-layout">
-    <aside class="gr-side">
-      <section class="kit-card">
-        <h2 class="kit-card-title">1. Período</h2>
-        <div class="kit-chips">
-          <button type="button" class="kit-chip" *ngFor="let p of presets" [class.active]="preset === p" (click)="setPreset(p)">{{ p }}</button>
+  <!-- Configuración: una barra arriba en lugar de una columna lateral -->
+  <section class="kit-card gr-config">
+    <div class="gr-config-row">
+      <div class="gr-field">
+        <span class="gr-label">Período</span>
+        <div class="gr-seg" role="group" aria-label="Período">
+          <button type="button" *ngFor="let p of presets" [class.on]="preset === p" (click)="setPreset(p)">{{ p }}</button>
         </div>
-        <div class="gr-dates">
-          <label class="kit-select"><span>Desde</span><input type="date" [(ngModel)]="from" [min]="svc.goLive" [max]="to" (ngModelChange)="preset = 'Personalizado'"></label>
-          <label class="kit-select"><span>Hasta</span><input type="date" [(ngModel)]="to" [min]="from" [max]="svc.today" (ngModelChange)="preset = 'Personalizado'"></label>
-        </div>
-        <label class="kit-select"><span>Comparar con</span>
-          <select [(ngModel)]="compare"><option value="">Sin comparación</option><option *ngFor="let p of compareOptions" [value]="p">{{ monthLabel(p) }}</option></select>
-        </label>
-        <p class="gr-hint">Los reportes usan los datos registrados en SOGO desde el {{ dmy(svc.goLive) }} (inicio en Contabilidad › Integración). La comparación es contra un mes completo.</p>
-      </section>
-
-      <section class="kit-card">
-        <div class="gr-row"><h2 class="kit-card-title">2. Módulos a incluir</h2><span class="rp-muted">{{ selected.size }} de {{ allowed.length }}</span></div>
-        <label class="gr-check" *ngFor="let m of modules" [class.off]="!svc.canView(m)">
-          <input type="checkbox" [checked]="selected.has(m)" [disabled]="!svc.canView(m)" (change)="toggle(m)">
-          {{ label(m) }}<small *ngIf="!svc.canView(m)">sin permiso</small>
-        </label>
-      </section>
-
-      <section class="kit-card">
-        <h2 class="kit-card-title">3. Nivel de detalle</h2>
-        <div class="kit-chips">
-          <button type="button" class="kit-chip" [class.active]="detail === 'Resumen'" (click)="detail = 'Resumen'">Resumen</button>
-          <button type="button" class="kit-chip" [class.active]="detail === 'Detallado'" (click)="detail = 'Detallado'">Detallado</button>
-        </div>
-        <p class="kit-error" *ngIf="error">{{ error }}</p>
-        <button type="button" class="rsv-btn rsv-btn--primary gr-generate" (click)="generate()">Generar reporte</button>
-      </section>
-    </aside>
-
-    <section class="gr-preview" *ngIf="report as r">
-      <header class="gr-banner">
-        <div>
-          <span>SOGO · REPORTE GENERAL</span>
-          <h2>{{ svc.company }}</h2>
-          <p>Período {{ dmy(r.range.from) }} – {{ dmy(r.range.to) }}<ng-container *ngIf="r.compare"> · comparado con {{ monthName(r.compare) }} {{ r.compare.slice(0, 4) }}</ng-container></p>
-        </div>
-        <span class="gr-tag">Vista previa</span>
-      </header>
-      <div class="gr-body">
-        <p class="kit-banner kit-banner--warn" *ngIf="stale">Los datos cambiaron desde que se generó el reporte. <button type="button" class="rsv-btn rsv-btn--outline" (click)="generate()">Actualizar</button></p>
-        <div class="kit-kpis rp-kpis">
-          <div class="rp-kpi" *ngFor="let k of r.kpis">
-            <span>{{ k.label }}</span><strong>{{ k.value }}</strong>
-            <div><rp-delta [d]="k.delta"></rp-delta><small class="rp-cmp">{{ k.cmp }}</small></div>
-          </div>
-        </div>
-
-        <h3 class="gr-h3">Resumen por módulo</h3>
-        <div class="kit-table-wrap">
-          <table class="kit-table rp-table">
-            <thead><tr><th>Módulo</th><th>Indicador principal</th><th class="r">Valor</th><th>Detalle</th><th class="r">{{ r.compare ? 'vs ' + monthName(r.compare) : 'Comparación' }}</th><th>Estado</th></tr></thead>
-            <tbody>
-              <tr *ngFor="let row of r.rows">
-                <td><a class="rp-module" [ngClass]="'rp-module--' + slug(row.module)" [routerLink]="link(row.module)">{{ row.module }}</a></td>
-                <td>{{ row.indicator }}</td>
-                <td class="r"><strong>{{ row.value }}</strong></td>
-                <td class="rp-muted">{{ row.detail }}</td>
-                <td class="r"><rp-delta [d]="row.delta"></rp-delta></td>
-                <td><span class="rsv-badge" [ngClass]="'rsv-badge--' + row.tone">{{ row.status }}</span></td>
-              </tr>
-              <tr *ngIf="!r.rows.length"><td colspan="6" class="kit-empty">Selecciona al menos un módulo.</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="rp-points" *ngIf="r.points.length">
-          <h3>Puntos a revisar</h3>
-          <div class="rp-point" *ngFor="let p of r.points" [ngClass]="p.tone">
-            <svg viewBox="0 0 24 24" aria-hidden="true" *ngIf="p.tone === 'danger'"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
-            <svg viewBox="0 0 24 24" aria-hidden="true" *ngIf="p.tone !== 'danger'"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>
-            <span>{{ p.text }}</span>
-          </div>
-        </div>
-
-        <ng-container *ngIf="r.detail === 'Detallado'">
-          <section *ngFor="let x of r.extra" class="gr-extra">
-            <h3 class="gr-h3">{{ x.title }}</h3>
-            <div class="kit-table-wrap">
-              <table class="kit-table rp-table">
-                <thead><tr><th *ngFor="let h of x.head">{{ h }}</th></tr></thead>
-                <tbody><tr *ngFor="let row of x.rows"><td *ngFor="let c of row">{{ c }}</td></tr>
-                  <tr *ngIf="!x.rows.length"><td [attr.colspan]="x.head.length" class="kit-empty">Sin registros en el período.</td></tr></tbody>
-              </table>
-            </div>
-          </section>
-        </ng-container>
-
-        <footer class="gr-foot">
-          <span>Generado {{ dmy(r.generatedAt) }} {{ r.generatedAt.slice(11, 16) }} por <strong>{{ svc.user }}</strong> · la exportación queda registrada en auditoría.</span>
-          <span>{{ r.detail }}</span>
-        </footer>
       </div>
-    </section>
-  </div>
+      <label class="kit-select gr-date"><span>Desde</span><input type="date" [(ngModel)]="from" [min]="svc.goLive" [max]="to" (ngModelChange)="preset = 'Personalizado'"></label>
+      <label class="kit-select gr-date"><span>Hasta</span><input type="date" [(ngModel)]="to" [min]="from" [max]="svc.today" (ngModelChange)="preset = 'Personalizado'"></label>
+      <label class="kit-select gr-cmp"><span>Comparar con</span>
+        <select [(ngModel)]="compare"><option value="">Sin comparación</option><option *ngFor="let p of compareOptions" [value]="p">{{ monthLabel(p) }}</option></select>
+      </label>
+      <div class="gr-field">
+        <span class="gr-label">Detalle</span>
+        <div class="gr-seg" role="group" aria-label="Nivel de detalle">
+          <button type="button" [class.on]="detail === 'Resumen'" (click)="detail = 'Resumen'">Resumen</button>
+          <button type="button" [class.on]="detail === 'Detallado'" (click)="detail = 'Detallado'">Detallado</button>
+        </div>
+      </div>
+      <button type="button" class="rsv-btn rsv-btn--primary gr-generate" (click)="generate()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>Generar
+      </button>
+    </div>
+    <div class="gr-modules">
+      <span class="gr-label">Módulos <small>{{ selected.size }} de {{ allowed.length }}</small></span>
+      <button type="button" *ngFor="let m of modules" class="gr-mod" [ngClass]="'gr-mod--' + slug(m)" [class.on]="selected.has(m)"
+              [disabled]="!svc.canView(m)" (click)="toggle(m)" [attr.aria-pressed]="selected.has(m)" [title]="svc.canView(m) ? '' : 'Tu rol no tiene permiso'">
+        <i aria-hidden="true"></i>{{ m }}
+      </button>
+    </div>
+    <p class="kit-error" *ngIf="error">{{ error }}</p>
+    <p class="gr-hint">Datos registrados en SOGO desde el {{ dmy(svc.goLive) }}. La comparación es contra un mes completo.</p>
+  </section>
+
+  <section class="gr-preview" *ngIf="report as r">
+    <header class="gr-banner">
+      <div>
+        <span>SOGO · REPORTE GENERAL</span>
+        <h2>{{ svc.company }}</h2>
+        <p>{{ dmy(r.range.from) }} – {{ dmy(r.range.to) }}<ng-container *ngIf="r.compare"> · comparado con {{ monthName(r.compare) }} {{ r.compare.slice(0, 4) }}</ng-container> · {{ r.detail }}</p>
+      </div>
+      <div class="gr-banner-stats">
+        <div><strong>{{ okCount(r) }}</strong><span>en orden</span></div>
+        <div><strong>{{ r.rows.length - okCount(r) }}</strong><span>para revisar</span></div>
+      </div>
+    </header>
+    <div class="gr-body">
+      <p class="kit-banner kit-banner--warn" *ngIf="stale">Los datos cambiaron desde que se generó el reporte. <button type="button" class="rsv-btn rsv-btn--outline" (click)="generate()">Actualizar</button></p>
+
+      <div class="kit-kpis rp-kpis">
+        <div class="rp-kpi" *ngFor="let k of r.kpis">
+          <span>{{ k.label }}</span><strong>{{ k.value }}</strong>
+          <div><rp-delta [d]="k.delta"></rp-delta><small class="rp-cmp">{{ k.cmp }}</small></div>
+        </div>
+      </div>
+
+      <h3 class="gr-h3">Resumen por módulo</h3>
+      <div class="gr-cards" *ngIf="r.rows.length; else noRows">
+        <a class="gr-card" *ngFor="let row of r.rows" [routerLink]="link(row.module)" [ngClass]="'gr-card--' + slug(row.module)">
+          <div class="gr-card-top">
+            <span class="rp-module" [ngClass]="'rp-module--' + slug(row.module)">{{ row.module }}</span>
+            <span class="rsv-badge" [ngClass]="'rsv-badge--' + row.tone">{{ row.status }}</span>
+          </div>
+          <span class="gr-card-ind">{{ row.indicator }}</span>
+          <strong class="gr-card-val">{{ row.value }}</strong>
+          <span class="gr-card-detail">{{ row.detail }}</span>
+          <div class="gr-card-foot">
+            <span><rp-delta [d]="row.delta"></rp-delta><small *ngIf="!row.delta.none && r.compare">vs {{ monthName(r.compare) }}</small></span>
+            <span class="gr-card-go">Ver reporte →</span>
+          </div>
+        </a>
+      </div>
+      <ng-template #noRows><div class="rp-empty-box"><strong>Ningún módulo seleccionado</strong>Activa al menos un módulo en la barra de arriba y pulsa «Generar».</div></ng-template>
+
+      <div class="rp-points" *ngIf="r.points.length">
+        <h3>Puntos a revisar</h3>
+        <div class="rp-point" *ngFor="let p of r.points" [ngClass]="p.tone">
+          <svg viewBox="0 0 24 24" aria-hidden="true" *ngIf="p.tone === 'danger'"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" *ngIf="p.tone !== 'danger'"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4.5M12 17.5v.5"/></svg>
+          <span>{{ p.text }}</span>
+        </div>
+      </div>
+
+      <ng-container *ngIf="r.detail === 'Detallado'">
+        <section *ngFor="let x of r.extra" class="gr-extra">
+          <h3 class="gr-h3">{{ x.title }}</h3>
+          <div class="kit-table-wrap">
+            <table class="kit-table rp-table">
+              <thead><tr><th *ngFor="let h of x.head">{{ h }}</th></tr></thead>
+              <tbody><tr *ngFor="let row of x.rows"><td *ngFor="let c of row">{{ c }}</td></tr>
+                <tr *ngIf="!x.rows.length"><td [attr.colspan]="x.head.length" class="kit-empty">Sin registros en el período.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </ng-container>
+
+      <footer class="gr-foot">
+        <span>Generado {{ dmy(r.generatedAt) }} {{ r.generatedAt.slice(11, 16) }} por <strong>{{ svc.user }}</strong> · la exportación queda registrada en auditoría.</span>
+      </footer>
+    </div>
+  </section>
   `,
   styles: [`
-    .gr-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 18px; align-items: start; }
-    .gr-side { display: flex; flex-direction: column; gap: 14px; }
-    .gr-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0 8px; }
-    .gr-dates .kit-select { min-width: 0; }
-    .gr-hint { margin: 8px 0 0; font-size: 11.5px; color: #6B7280; line-height: 1.45; }
-    .gr-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .gr-check { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; color: #1F2937; cursor: pointer; }
-    .gr-check input { width: 17px; height: 17px; accent-color: #1565C0; }
-    .gr-check.off { color: #9AA5B4; cursor: not-allowed; }
-    .gr-check small { margin-left: auto; font-size: 11px; }
-    .gr-generate { width: 100%; margin-top: 14px; height: 46px; }
-    .gr-preview { background: #fff; border: 1px solid #E6EBF2; border-radius: 16px; overflow: hidden; }
-    .gr-banner { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; background: #0E3A66; color: #fff; padding: 20px 22px; }
+    /* Barra de configuración */
+    .gr-config { margin-bottom: 16px; padding: 14px 16px; background: linear-gradient(180deg, #F8FAFD, #F2F6FB); border-color: #E3E9F2; box-shadow: none; }
+    .gr-config-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+    .gr-field { display: flex; flex-direction: column; gap: 4px; }
+    .gr-label { font-size: 11px; font-weight: 600; color: #4B5563; }
+    .gr-label small { margin-left: 4px; font-weight: 500; color: #9CA3AF; }
+    .gr-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: #E7EDF5; }
+    .gr-seg button { height: 34px; padding: 0 12px; border: none; border-radius: 8px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 600; color: #4B5563; cursor: pointer; }
+    .gr-seg button.on { background: #fff; color: #0A3D6D; box-shadow: 0 1px 3px rgba(10, 37, 64, .14); }
+    .gr-date { min-width: 140px; height: 40px; }
+    .gr-cmp { min-width: 170px; height: 40px; }
+    .gr-generate { height: 40px; margin-left: auto; display: inline-flex; align-items: center; gap: 7px; }
+    .gr-generate svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    .gr-modules { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed #DCE4EE; }
+    .gr-modules .gr-label { margin-right: 4px; }
+    .gr-mod { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid #D5DEEA; background: #fff;
+      font: inherit; font-size: 12px; font-weight: 600; color: #6B7280; cursor: pointer; transition: all .15s; }
+    .gr-mod i { width: 8px; height: 8px; border-radius: 50%; background: #CBD5E1; }
+    .gr-mod.on { color: #0A2540; border-color: #9DB7D6; box-shadow: 0 1px 2px rgba(15, 23, 42, .06); }
+    .gr-mod.on i { background: var(--mod, #1565C0); }
+    .gr-mod:disabled { opacity: .45; cursor: not-allowed; }
+    .gr-mod--reservas, .gr-card--reservas { --mod: #1565C0; } .gr-mod--alojamiento, .gr-card--alojamiento { --mod: #1F7A52; }
+    .gr-mod--tra, .gr-card--tra { --mod: #6D3FC8; } .gr-mod--facturacion, .gr-card--facturacion { --mod: #B7791F; }
+    .gr-mod--nomina, .gr-card--nomina { --mod: #4B5563; } .gr-mod--contable, .gr-card--contable { --mod: #0B4A8B; }
+    .gr-mod--inventario, .gr-card--inventario { --mod: #166534; }
+    .gr-hint { margin: 8px 0 0; font-size: 11.5px; color: #9CA3AF; }
+
+    /* Vista previa */
+    .gr-preview { background: #fff; border: 1px solid #E6EBF2; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 14px rgba(15, 23, 42, .04); }
+    .gr-banner { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 24px;
+      background: linear-gradient(120deg, #0A2540 0%, #0E3A66 60%, #1565C0 100%); color: #fff; }
     .gr-banner span { font-size: 10.5px; letter-spacing: .08em; color: rgba(255,255,255,.75); }
-    .gr-banner h2 { margin: 4px 0 2px; font-size: 19px; }
+    .gr-banner h2 { margin: 4px 0 2px; font-size: 20px; }
     .gr-banner p { margin: 0; font-size: 12.5px; color: rgba(255,255,255,.85); }
-    .gr-tag { background: rgba(255,255,255,.16); padding: 4px 9px; border-radius: 6px; font-size: 11.5px !important; letter-spacing: 0 !important; color: #fff !important; white-space: nowrap; }
-    .gr-body { padding: 20px 22px; }
-    .gr-h3 { margin: 6px 0 10px; font-size: 14px; color: #0A2540; }
+    .gr-banner-stats { display: flex; gap: 10px; }
+    .gr-banner-stats div { min-width: 92px; padding: 8px 12px; border-radius: 10px; background: rgba(255,255,255,.12); text-align: center; }
+    .gr-banner-stats strong { display: block; font-size: 20px; }
+    .gr-banner-stats span { font-size: 11px; letter-spacing: 0; color: rgba(255,255,255,.8); }
+    .gr-body { padding: 18px 22px 20px; }
+    .gr-h3 { display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; font-size: 14px; color: #0A2540; }
+    .gr-h3::before { content: ''; width: 4px; height: 15px; border-radius: 2px; background: #1565C0; }
+
+    /* Tarjetas por módulo */
+    .gr-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+    .gr-card { --mod: #1565C0; position: relative; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 12px 18px;
+      border: 1px solid #E6EBF2; border-radius: 14px; background: #fff; text-decoration: none; color: inherit; overflow: hidden;
+      transition: box-shadow .15s, transform .15s, border-color .15s; }
+    .gr-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--mod); }
+    .gr-card:hover { border-color: #C9D8EA; box-shadow: 0 8px 20px rgba(15, 23, 42, .08); transform: translateY(-1px); }
+    .gr-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .gr-card-ind { font-size: 12px; color: #6B7280; }
+    .gr-card-val { font-size: 21px; font-weight: 700; color: #0A2540; letter-spacing: -.01em; }
+    .gr-card-detail { font-size: 12px; color: #4B5563; line-height: 1.4; min-height: 34px; }
+    .gr-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #EEF1F5; font-size: 11px; color: #9CA3AF; }
+    .gr-card-go { font-weight: 600; color: #0B6FD0; opacity: 0; transition: opacity .15s; }
+    .gr-card:hover .gr-card-go, .gr-card:focus-visible .gr-card-go { opacity: 1; }
+
     .gr-extra { margin-top: 18px; }
-    .gr-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid #EEF1F5; margin-top: 18px; padding-top: 12px; font-size: 11.5px; color: #6B7280; }
-    a.rp-module { text-decoration: none; }
+    .gr-foot { border-top: 1px solid #EEF1F5; margin-top: 18px; padding-top: 12px; font-size: 11.5px; color: #6B7280; }
     .kit-banner .rsv-btn { margin-left: auto; height: 32px; }
-    @media (max-width: 1000px) { .gr-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 900px) { .gr-generate { margin-left: 0; } .gr-banner { flex-direction: column; align-items: flex-start; } }
   `],
 })
 export class GeneralComponent implements OnDestroy {
@@ -186,6 +226,8 @@ export class GeneralComponent implements OnDestroy {
   report: Report | null = null;
   error = '';
   stale = false;
+  /** true cuando el usuario pulsó «Generar»: desde ahí un cambio de datos solo se avisa, no se rehace. */
+  private userGenerated = false;
   private sub: Subscription;
   private version = 0;
 
@@ -195,7 +237,8 @@ export class GeneralComponent implements OnDestroy {
     this.compare = shiftMonth(svc.livePeriod, -1);
     REPORT_MODULES.filter(m => svc.canView(m)).forEach(m => this.selected.add(m));
     this.sub = svc.changes$.subscribe(v => {
-      if (!this.report) this.build();
+      // Mientras nadie haya pulsado «Generar», el reporte automático se rehace solo al terminar de cargar los datos
+      if (!this.report || !this.userGenerated) this.build();
       else if (v !== this.version) this.stale = true;
       this.version = v;
     });
@@ -237,6 +280,7 @@ export class GeneralComponent implements OnDestroy {
       : this.from < this.svc.goLive ? `El rango debe empezar desde el ${dmy(this.svc.goLive)}.` : '';
     if (this.error) return;
     this.build();
+    this.userGenerated = true;
     this.svc.log('reporte general generado', `${rangeLabel(this.report!.range)} · ${this.report!.modules.length} módulos · ${this.detail}`);
   }
 
@@ -354,6 +398,9 @@ export class GeneralComponent implements OnDestroy {
     this.report = { range, compare: this.compare, modules: rows.map(r => r.module), detail: this.detail, kpis, rows, points: points.slice(0, 5), generatedAt: s.generatedStamp(), extra };
     this.stale = false;
   }
+
+  /** Módulos sin novedad (estado Normal). */
+  okCount(r: Report): number { return r.rows.filter(x => x.tone === 'ok').length; }
 
   schedule(): void { this.router.navigate(['/dashboard/reports/scheduled'], { queryParams: { nuevo: 'General' } }); }
 

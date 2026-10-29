@@ -172,7 +172,7 @@ export class AccountingService {
   getSettings(): AccountingSettings { return { ...this.settings, mapping: { ...this.settings.mapping } }; }
 
   get actor(): string { return this.audit.actorName(); }
-  /** Razón social del emisor (Facturación › Configuración) para encabezados y documentos. */
+  /** Razón social del emisor (Facturación › Impuestos y DIAN) para encabezados y documentos. */
   get company(): string { return this.config.get().issuer.name; }
   get canCreate(): boolean { return this.audit.can('Contabilidad', 'create'); }
   get canEdit(): boolean { return this.audit.can('Contabilidad', 'edit'); }

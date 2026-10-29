@@ -43,7 +43,7 @@ public class AlertaCorreoService {
         def("arrivals", "Llegadas y salidas del día", "Alojamiento");
         def("tra", "TRA pendiente de envío", "TRA");
         def("invoice-rejected", "Factura rechazada por la DIAN", "Facturación");
-        def("invoice-range", "Rango de facturación al 80 %", "Facturación › Configuración");
+        def("invoice-range", "Rango de facturación al 80 %", "Facturación › Impuestos y DIAN");
         def("payroll", "Nómina lista para aprobar", "Nómina");
         def("accounts", "Cuenta bloqueada o IP nueva", "Usuarios");
         def("report-failed", "Reporte programado fallido", "Reportes › Programados");

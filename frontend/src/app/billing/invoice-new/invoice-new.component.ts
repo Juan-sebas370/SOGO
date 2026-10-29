@@ -7,13 +7,14 @@ import { BillingConfigService } from '../billing-config.service';
 import { ChargeService } from '../charge.service';
 import {
   Invoice, InvoiceLine, Buyer, ConceptCategory, computeTotals, lineGross, lineDiscount, lineNet, taxLabel,
-  validateBuyer, nitCheckDigit, isValidInvoice, DOC_TYPES, FISCAL_RESPONSIBILITIES, LOCATIONS, FiscalCheck
+  validateBuyer, nitCheckDigit, isValidInvoice, DOC_TYPES, FISCAL_RESPONSIBILITIES, EXTRA_CATEGORIES, CREDIT_TERMS, FiscalCheck
 } from '../invoice.model';
 import { InvoiceSheetComponent } from '../invoice-sheet/invoice-sheet.component';
 import { ReservationService } from '../../reservations/reservation.service';
 import { Reservation, lodgingLabel, paidAmount, isInHouse, isVoid, splitFullName } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
+import { CO_DEPARTMENTS, COUNTRY_OPTIONS, townsOf, isColombia, formatPlace } from '../../shared/colombia';
 import { UsersService } from '../../users/users.service';
 import { toast } from '../../shared/toast/toast.service';
 import { serverMessage } from '../../shared/toast/notify.interceptor';
@@ -53,7 +54,7 @@ type Step = 1 | 2 | 3;
         <div class="bil-card-head">
           <div>
             <span class="bil-card-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></span>
-            <div><h2 class="bil-card-title">Huésped y estadía</h2><span class="bil-card-sub">CU02 · Seleccionar huésped</span></div>
+            <div><h2 class="bil-card-title">Huésped y estadía</h2><span class="bil-card-sub">Busca la reserva que vas a facturar</span></div>
           </div>
           <span class="rsv-badge" *ngIf="reservation" [ngClass]="stayComplete ? 'rsv-badge--ok' : 'rsv-badge--warn'">
             {{ stayComplete ? 'Información completa' : 'Faltan datos del huésped' }}
@@ -105,7 +106,7 @@ type Step = 1 | 2 | 3;
         <div class="bil-card-head">
           <div>
             <span class="bil-card-icon"><svg viewBox="0 0 24 24"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M2 16h20"/><path d="M6 10V7a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></span>
-            <div><h2 class="bil-card-title">Alojamiento y consumos</h2><span class="bil-card-sub">CU03 · La reserva y los consumos cargados a la estadía</span></div>
+            <div><h2 class="bil-card-title">Alojamiento y consumos</h2><span class="bil-card-sub">La reserva y los consumos cargados a la estadía</span></div>
           </div>
           <div class="nf-card-actions">
             <button type="button" class="rsv-btn rsv-btn--outline nf-sm" (click)="openDiscount()">Aplicar descuento</button>
@@ -186,7 +187,7 @@ type Step = 1 | 2 | 3;
         <div class="bil-card-head">
           <div>
             <span class="bil-card-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15l2 2 4-4"/></svg></span>
-            <div><h2 class="bil-card-title">Datos del adquiriente</h2><span class="bil-card-sub">CU04 · Validar datos fiscales</span></div>
+            <div><h2 class="bil-card-title">Datos del adquiriente</h2><span class="bil-card-sub">Quien recibe la factura ante la DIAN</span></div>
           </div>
           <span class="rsv-badge rsv-badge--info">Persona {{ inv.buyer.personType.toLowerCase() }}</span>
         </div>
@@ -243,27 +244,62 @@ type Step = 1 | 2 | 3;
           </div>
           <div class="rsv-field">
             <label for="f-country">País *</label>
-            <select id="f-country" class="rsv-input" [(ngModel)]="inv.buyer.country">
-              <option>Colombia</option><option>Otro país</option>
-            </select>
+            <input id="f-country" type="text" class="rsv-input" list="nf-countries" [(ngModel)]="inv.buyer.country" (ngModelChange)="onCountry()" autocomplete="country-name">
+            <datalist id="nf-countries"><option *ngFor="let c of countries" [value]="c"></option></datalist>
           </div>
-          <div class="rsv-field">
-            <label for="f-dept">Departamento *</label>
-            <select id="f-dept" class="rsv-input" [class.nf-bad]="bad('place') && !inv.buyer.department" [(ngModel)]="inv.buyer.department" (ngModelChange)="inv.buyer.city = ''">
-              <option value="">Seleccionar...</option>
-              <option *ngFor="let d of departments">{{ d }}</option>
-            </select>
-          </div>
-          <div class="rsv-field">
-            <label for="f-city">Ciudad *</label>
-            <input id="f-city" type="text" class="rsv-input" [class.nf-bad]="bad('place') && !inv.buyer.city" [(ngModel)]="inv.buyer.city" list="nf-cities">
-            <datalist id="nf-cities"><option *ngFor="let c of cities" [value]="c"></option></datalist>
-          </div>
+          <ng-container *ngIf="buyerInColombia; else buyerAbroad">
+            <div class="rsv-field">
+              <label for="f-dept">Departamento *</label>
+              <select id="f-dept" class="rsv-input" [class.nf-bad]="bad('place') && !inv.buyer.department" [(ngModel)]="inv.buyer.department" (ngModelChange)="inv.buyer.city = ''">
+                <option value="">Seleccionar…</option>
+                <option *ngFor="let d of departments" [value]="d.name">{{ d.name }}</option>
+              </select>
+            </div>
+            <div class="rsv-field">
+              <label for="f-city">Municipio *</label>
+              <select id="f-city" class="rsv-input" [class.nf-bad]="bad('place') && !!inv.buyer.department" [(ngModel)]="inv.buyer.city" [disabled]="!inv.buyer.department">
+                <option value="">{{ inv.buyer.department ? 'Seleccionar…' : 'Elige el departamento' }}</option>
+                <option *ngFor="let c of cities" [value]="c">{{ c }}</option>
+              </select>
+            </div>
+          </ng-container>
+          <ng-template #buyerAbroad>
+            <div class="rsv-field">
+              <label for="f-region">Estado / provincia *</label>
+              <input id="f-region" type="text" class="rsv-input" [class.nf-bad]="bad('place') && !inv.buyer.department" [(ngModel)]="inv.buyer.department" maxlength="60">
+            </div>
+            <div class="rsv-field">
+              <label for="f-city-abroad">Ciudad *</label>
+              <input id="f-city-abroad" type="text" class="rsv-input" [class.nf-bad]="bad('place') && !inv.buyer.city" [(ngModel)]="inv.buyer.city" maxlength="60">
+            </div>
+          </ng-template>
           <div class="rsv-field">
             <label for="f-address">Dirección *</label>
             <input id="f-address" type="text" class="rsv-input" [class.nf-bad]="bad('address')" [(ngModel)]="inv.buyer.address" placeholder="Ej. Cra 14 # 20-35">
             <small class="nf-err" *ngIf="bad('address')">Campo obligatorio</small>
           </div>
+        </div>
+
+        <h3 class="bil-section-label">Forma de pago</h3>
+        <div class="nf-term">
+          <div class="nf-radios">
+            <label [class.active]="inv.paymentTerm === 'Contado'">
+              <input type="radio" name="term" [checked]="inv.paymentTerm === 'Contado'" (change)="setTerm('Contado')"> Contado · se paga al emitir
+            </label>
+            <label [class.active]="inv.paymentTerm === 'Crédito'">
+              <input type="radio" name="term" [checked]="inv.paymentTerm === 'Crédito'" (change)="setTerm('Crédito')"> Crédito · se paga después
+            </label>
+          </div>
+          <div class="nf-term-due" *ngIf="inv.paymentTerm === 'Crédito'">
+            <div class="rsv-field">
+              <label for="f-due">Fecha de vencimiento *</label>
+              <input id="f-due" type="date" class="rsv-input" [class.nf-bad]="!termOk" [(ngModel)]="inv.dueDate" [min]="tomorrow">
+            </div>
+            <div class="nf-term-quick" role="group" aria-label="Plazo">
+              <button type="button" *ngFor="let d of creditTerms" [class.active]="inv.dueDate === inDays(d)" (click)="inv.dueDate = inDays(d)">{{ d }} días</button>
+            </div>
+          </div>
+          <small class="nf-err" *ngIf="!termOk">La fecha de vencimiento de una factura a crédito debe ser posterior a hoy.</small>
         </div>
 
         <div class="nf-fiscal-foot">
@@ -296,8 +332,9 @@ type Step = 1 | 2 | 3;
           <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           La información fiscal queda asociada a la factura y al huésped. Cada validación registra fecha, hora y usuario.
         </p>
-        <button type="button" class="rsv-btn rsv-btn--primary bil-block-btn" [disabled]="failed.length > 0" (click)="goStep(3)">Continuar a vista previa</button>
+        <button type="button" class="rsv-btn rsv-btn--primary bil-block-btn" [disabled]="failed.length > 0 || !termOk" (click)="goStep(3)">Continuar a vista previa</button>
         <p class="bil-hint" *ngIf="failed.length">Corrige {{ failed.length }} dato{{ failed.length === 1 ? '' : 's' }} para continuar</p>
+        <p class="bil-hint" *ngIf="!failed.length && !termOk">Elige la fecha de vencimiento del crédito</p>
         <button type="button" class="rsv-btn rsv-btn--outline bil-block-btn" *ngIf="!correcting" (click)="goStep(1)">Volver a estadía y consumos</button>
         <a class="rsv-btn rsv-btn--outline bil-block-btn" *ngIf="correcting" [routerLink]="['/dashboard/billing', inv.id]">Cancelar corrección</a>
       </aside>
@@ -349,7 +386,7 @@ type Step = 1 | 2 | 3;
   <ng-template #totalsCard>
     <section class="bil-card">
       <div class="bil-card-head nf-result-head">
-        <div><h3 class="bil-card-title">Totales e impuestos</h3><span class="bil-card-sub">CU05 · Recalculado automáticamente</span></div>
+        <div><h3 class="bil-card-title">Totales e impuestos</h3><span class="bil-card-sub">Se recalculan solos</span></div>
         <span class="rsv-badge rsv-badge--ok">Actualizado</span>
       </div>
       <dl class="bil-totals">
@@ -384,7 +421,7 @@ type Step = 1 | 2 | 3;
         </div>
         <div class="rsv-field">
           <label for="d-label">Motivo</label>
-          <input id="d-label" type="text" class="rsv-input" [(ngModel)]="discountForm.label" placeholder="temporada">
+          <input id="d-label" type="text" class="rsv-input" [(ngModel)]="discountForm.label" placeholder="Ej.: temporada baja, cliente frecuente">
         </div>
       </div>
       <p class="nf-err" *ngIf="modalError">{{ modalError }}</p>
@@ -444,8 +481,12 @@ export class InvoiceNewComponent {
   readonly stepNames = ['Estadía y consumos', 'Datos fiscales', 'Vista previa y emisión'];
   readonly docTypes = DOC_TYPES;
   readonly responsibilities = FISCAL_RESPONSIBILITIES;
-  readonly departments = Object.keys(LOCATIONS);
-  readonly categories: ConceptCategory[] = ['Daños y faltantes', 'Lavandería', 'Eventos y pasadías', 'Otro'];
+  readonly departments = CO_DEPARTMENTS;
+  readonly countries = COUNTRY_OPTIONS;
+  readonly categories = EXTRA_CATEGORIES;
+  readonly creditTerms = CREDIT_TERMS;
+  readonly tomorrow = isoDate(1);
+  readonly inDays = isoDate;
 
   readonly money = fmtMoney;
   readonly date = fmtDate;
@@ -597,7 +638,7 @@ export class InvoiceNewComponent {
     return [
       { ok: this.stayComplete, label: 'Huésped y estadía completos', detail: this.reservation ? this.reservation.code : 'Selecciona una reserva' },
       { ok: this.t.count > 0, label: 'Conceptos facturables registrados', detail: `${this.t.count} incluido${this.t.count === 1 ? '' : 's'}` },
-      { ok: active.length > 0, label: `Configuración tributaria vigente (${labels})`, detail: 'Tarifas de Integración y configuración' },
+      { ok: active.length > 0, label: `Configuración tributaria vigente (${labels})`, detail: active.length ? 'Facturación › Impuestos y DIAN' : 'Configúralas en Facturación › Impuestos y DIAN' },
     ];
   }
 
@@ -606,7 +647,7 @@ export class InvoiceNewComponent {
   openDiscount(): void {
     this.modalError = '';
     const first = this.includedLines[0];
-    this.discountForm = { lineId: first?.id ?? '', pct: first?.discountPct || 5, label: first?.discountLabel || 'temporada' };
+    this.discountForm = { lineId: first?.id ?? '', pct: first?.discountPct || (null as unknown as number), label: first?.discountLabel || '' };
   }
 
   applyDiscount(): void {
@@ -671,7 +712,23 @@ export class InvoiceNewComponent {
   get failedSummary(): string { return this.failed.map(c => `${c.label}: ${c.detail.toLowerCase()}`).join(' · '); }
   check(key: string): FiscalCheck { return this.checks.find(c => c.key === key)!; }
   bad(key: string): boolean { return !this.check(key).ok; }
-  get cities(): string[] { return LOCATIONS[this.inv.buyer.department] ?? []; }
+  get cities(): string[] { return townsOf(this.inv.buyer.department); }
+  get buyerInColombia(): boolean { return isColombia(this.inv.buyer.country); }
+
+  /** Al cambiar de país, lo elegido deja de aplicar (los departamentos de Colombia no sirven afuera, y al revés). */
+  onCountry(): void {
+    const b = this.inv.buyer;
+    const known = CO_DEPARTMENTS.some(d => d.name === b.department);
+    if (this.buyerInColombia !== known) { b.department = ''; b.city = ''; }
+  }
+
+  // ── Forma de pago ──
+  /** Contado vence el día de emisión; crédito, en la fecha que se elija (por defecto a 30 días). */
+  setTerm(term: Invoice['paymentTerm']): void {
+    this.inv.paymentTerm = term;
+    this.inv.dueDate = term === 'Crédito' ? (this.inv.dueDate > isoDate(0) ? this.inv.dueDate : isoDate(30)) : isoDate(0);
+  }
+  get termOk(): boolean { return this.inv.paymentTerm === 'Contado' || this.inv.dueDate > isoDate(0); }
   get expectedDv(): string { return nitCheckDigit(this.inv.buyer.docNumber); }
 
   onPersonType(): void {
@@ -705,6 +762,7 @@ export class InvoiceNewComponent {
     return [
       { ok: !!this.inv.fiscalValidatedAt && !this.failed.length, label: 'Datos fiscales validados', detail: this.inv.fiscalValidatedAt ? `${fmtDateTime(this.inv.fiscalValidatedAt)} · ${this.user}` : 'Pendiente' },
       { ok: this.t.count > 0 && this.t.total > 0, label: 'Totales e impuestos calculados', detail: `${this.t.count} conceptos · ${fmtMoney(this.t.total)}` },
+      { ok: this.termOk, label: 'Forma de pago', detail: this.inv.paymentTerm === 'Contado' ? 'Contado' : this.termOk ? `Crédito · vence el ${fmtDate(this.inv.dueDate)}` : 'Falta la fecha de vencimiento' },
       { ok: !blockers.length, label: 'Emisor y resolución DIAN', detail: blockers[0] ?? `Resolución vigente · quedan ${usage.left.toLocaleString('es-CO')} números` },
       { ok: this.correcting || usage.left > 0, label: 'Rango de numeración', detail: usage.left > 0 ? `Próximo número ${this.nextNumber}` : 'Se agotó el rango autorizado' },
     ];
@@ -752,7 +810,7 @@ export class InvoiceNewComponent {
     const names = name !== r.guestName ? (([firstName, lastName]) => ({ firstName, lastName }))(splitFullName(name)) : {};
     this.reservations.update(r.id, {
       guestName: name, ...names, docNumber: b.docNumber, email: b.email, phone: b.phone,
-      city: `${b.country} - ${b.city}, ${b.department}`,
+      city: formatPlace({ country: b.country, department: b.department, town: b.city }),
     });
   }
 }

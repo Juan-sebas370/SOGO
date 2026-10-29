@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -24,10 +25,10 @@ const PAGE = 10;
 @Component({
   selector: 'app-reports-reservations',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, BarsComponent, DonutComponent, DeltaComponent],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink, BarsComponent, DonutComponent, DeltaComponent],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Reservas</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Reporte de reservas</h1>

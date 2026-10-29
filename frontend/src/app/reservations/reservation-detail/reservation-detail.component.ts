@@ -5,7 +5,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
   Reservation, ReservationStatus, PaymentMethod, PaymentStatus,
-  paymentStatus, totalGuests, lodgingLabel, totalAmount, paidAmount, balance, lastPayment, isVoid, isInHouse, awaitsCheckIn
+  paymentStatus, totalGuests, lodgingLabel, totalAmount, paidAmount, balance, lastPayment, isVoid, isInHouse, awaitsCheckIn,
+  GUEST_PAYMENT_METHODS,
 } from '../reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney, statusBadge, paymentBadge } from '../reservation-format';
 import { openConfirmation, openPaymentReceipt, guestMailto, downloadCsv } from '../reservation-documents';
@@ -432,7 +433,7 @@ const PAYMENT_TONE: Record<PaymentStatus, string> = { 'Pagado': 'ok', 'Parcial':
 export class ReservationDetailComponent {
 
   readonly cancelReasons = ['Cambio de planes del huésped', 'Solicitud del huésped', 'Error en la reserva', 'Otro'];
-  readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
+  readonly paymentMethods = GUEST_PAYMENT_METHODS;
 
   readonly date = fmtDate;
   readonly dateTime = fmtDateTime;

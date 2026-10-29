@@ -5,6 +5,8 @@
 // estado de pago se derivan; nunca se guardan aparte.
 // =====================================================
 
+import { isColombia, matchColombia } from '../shared/colombia';
+
 // Daños y faltantes: dotación que el huésped perdió o dañó (Inventarios › Dotación de la casa).
 // Restaurante y Minibar quedan por compatibilidad: el hospedaje no vende comidas ni bebidas.
 export type ConceptCategory = 'Alojamiento' | 'Daños y faltantes' | 'Restaurante' | 'Minibar' | 'Lavandería' | 'Eventos y pasadías' | 'Otro';
@@ -167,6 +169,9 @@ export function validateBuyer(b: Buyer): FiscalCheck[] {
   const emailOk = EMAIL_RE.test(b.email.trim());
   const required: (keyof Buyer)[] = ['name', 'docNumber', 'fiscalResponsibility', 'email', 'country', 'department', 'city', 'address'];
   const empty = required.filter(k => !String(b[k]).trim()).length;
+  // En Colombia el departamento y el municipio deben existir en el catálogo DANE (la DIAN exige sus códigos)
+  const filled = !!(b.country && b.department && b.city);
+  const placeOk = filled && (!isColombia(b.country) || matchColombia(b.department, b.city).town !== '');
 
   return [
     { key: 'name', field: 'name', label: 'Nombre o razón social', ok: b.name.trim().length >= 3, detail: b.name.trim().length >= 3 ? 'Completo' : 'Campo obligatorio vacío' },
@@ -174,7 +179,8 @@ export function validateBuyer(b: Buyer): FiscalCheck[] {
     { key: 'resp', field: 'fiscalResponsibility', label: 'Responsabilidad fiscal', ok: !!b.fiscalResponsibility, detail: b.fiscalResponsibility ? 'Código del catálogo DIAN' : 'Selecciona una responsabilidad' },
     { key: 'email', field: 'email', label: 'Correo de facturación', ok: emailOk, detail: emailOk ? 'Formato válido' : !b.email.trim() ? 'Campo obligatorio vacío' : 'Formato no válido' },
     { key: 'address', field: 'address', label: 'Dirección', ok: !!b.address.trim(), detail: b.address.trim() ? 'Completa' : 'Campo obligatorio vacío' },
-    { key: 'place', label: 'País, departamento y ciudad', ok: !!(b.country && b.department && b.city), detail: b.country && b.department && b.city ? 'Códigos del catálogo' : 'Completa la ubicación' },
+    { key: 'place', label: 'País, departamento y municipio', ok: placeOk,
+      detail: !filled ? 'Completa la ubicación' : placeOk ? `${b.city}, ${b.department}` : 'El municipio no está en el catálogo DANE de ese departamento' },
     { key: 'required', label: 'Campos obligatorios', ok: empty === 0, detail: empty ? `${empty} campo${empty === 1 ? '' : 's'} vacío${empty === 1 ? '' : 's'}` : 'Todos diligenciados' },
   ];
 }
@@ -195,22 +201,14 @@ export const FISCAL_RESPONSIBILITIES = [
   'O-47 · Régimen simple de tributación',
 ];
 
-/** Catálogo reducido de ubicación (se amplía cuando se conecte el catálogo DIAN completo). */
-export const LOCATIONS: Record<string, string[]> = {
-  'Quindío':         ['Armenia', 'Calarcá', 'Circasia', 'Filandia', 'La Tebaida', 'Montenegro', 'Quimbaya', 'Salento'],
-  'Risaralda':       ['Pereira', 'Dosquebradas', 'Santa Rosa de Cabal'],
-  'Caldas':          ['Manizales', 'Chinchiná', 'Villamaría'],
-  'Antioquia':       ['Medellín', 'Envigado', 'Itagüí', 'Rionegro'],
-  'Bogotá D.C.':     ['Bogotá'],
-  'Cundinamarca':    ['Chía', 'Soacha', 'Zipaquirá', 'Fusagasugá'],
-  'Valle del Cauca': ['Cali', 'Palmira', 'Tuluá', 'Buga'],
-  'Santander':       ['Bucaramanga', 'Floridablanca', 'Girón'],
-  'Tolima':          ['Ibagué', 'Espinal'],
-  'Bolívar':         ['Cartagena'],
-  'Atlántico':       ['Barranquilla', 'Soledad'],
-  'Huila':           ['Neiva', 'Pitalito'],
-  'Nariño':          ['Pasto', 'Ipiales'],
-};
+/** Conceptos que el hospedaje factura hoy (sin comidas ni bebidas). Restaurante y Minibar solo existen en facturas viejas. */
+export const BILLABLE_CATEGORIES: ConceptCategory[] = ['Alojamiento', 'Daños y faltantes', 'Lavandería', 'Eventos y pasadías', 'Otro'];
+
+/** Conceptos que se agregan a mano a una factura (el alojamiento sale de la reserva). */
+export const EXTRA_CATEGORIES: ConceptCategory[] = BILLABLE_CATEGORIES.filter(c => c !== 'Alojamiento');
+
+/** Plazos de crédito que se ofrecen al facturar (días); también se puede elegir una fecha. */
+export const CREDIT_TERMS = [15, 30, 60];
 
 // ── CUFE ─────────────────────────────────────────────
 
@@ -226,7 +224,9 @@ export function checkCufe(text: string): { value: string; error: string } {
   let t = (text ?? '').replace(/\s+/g, '');
   const k = t.toLowerCase().indexOf('documentkey=');
   if (k >= 0) t = t.slice(k + 'documentkey='.length).split('&')[0];
-  const found = t.length > 96 ? t.match(/[0-9a-f]{96}/i)?.[0] : undefined;
+  // Solo se extrae un bloque de 96 que esté separado del resto (p. ej. dentro de un texto); 98 caracteres
+  // hexadecimales seguidos no son "un CUFE con sobra": no se sabe cuáles 96 son los buenos, así que se rechaza.
+  const found = t.length > 96 ? t.match(/(?<![0-9a-f])[0-9a-f]{96}(?![0-9a-f])/i)?.[0] : undefined;
   const value = (found ?? t).toLowerCase();
   if (!value) return { value, error: '' };
   const bad = [...new Set(value.replace(/[0-9a-f]/g, '').split(''))];

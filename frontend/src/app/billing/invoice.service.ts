@@ -10,6 +10,7 @@ import { ReservationService } from '../reservations/reservation.service';
 import { UsersService } from '../users/users.service';
 import { Reservation, PaymentMethod, lodgingLabel, paidAmount, isInHouse } from '../reservations/reservation.model';
 import { isoDate } from '../shared/date-utils';
+import { parsePlace, isColombia } from '../shared/colombia';
 import { API_URL } from '../api';
 
 const DOC_TYPE_CODE: Record<string, BuyerDocType> = {
@@ -81,12 +82,12 @@ export class InvoiceService {
   buyerFor(r: Reservation): Buyer {
     const previous = this.data.find(i => i.billTo === 'Huésped' && i.buyer.docNumber === r.docNumber);
     if (previous) return { ...previous.buyer };
-    const [country, rest = ''] = r.city.split(' - ');
-    const [city = '', department = ''] = rest.split(',').map(s => s.trim());
+    // Lugar de residencia de la reserva, ya ajustado al catálogo DANE (también registros viejos sin país)
+    const place = parsePlace(r.city);
     return {
       personType: 'Natural', docType: DOC_TYPE_CODE[r.docType] ?? 'CC', docNumber: r.docNumber, dv: '',
       name: r.guestName, fiscalResponsibility: 'R-99-PN · No aplica – Otros',
-      email: r.email, phone: r.phone, country: country || 'Colombia', department, city, address: '',
+      email: r.email, phone: r.phone, country: place.country, department: place.department, city: place.town, address: '',
     };
   }
 
@@ -99,7 +100,7 @@ export class InvoiceService {
 
   /** Líneas facturables: el alojamiento de la reserva + los consumos cargados a la estadía y aún sin facturar. */
   buildLines(r: Reservation): InvoiceLine[] {
-    const foreign = r.docType === 'Pasaporte' && !r.city.startsWith('Colombia');
+    const foreign = r.docType === 'Pasaporte' && !isColombia(parsePlace(r.city).country);
     const isDayPass = r.nights === 0;
     const lodgingCategory = isDayPass ? 'Eventos y pasadías' : 'Alojamiento';
     const lodgingTax = this.config.taxFor(lodgingCategory, foreign);
@@ -176,7 +177,7 @@ export class InvoiceService {
   }
 
   /** Respuesta de la DIAN informada por el proveedor: aceptada (CUFE) o rechazada (motivo). */
-  async registerDianResponse(id: string, r: { accepted: true; cufe: string } | { accepted: false; reason: string }): Promise<void> {
+  async registerDianResponse(id: string, r: { accepted: true; cufe: string; note?: string } | { accepted: false; reason: string }): Promise<void> {
     const inv = await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/respuesta-dian`, r));
     this.upsert(inv);
     this.users.addLog(r.accepted ? 'Factura aceptada por la DIAN' : 'Factura rechazada por la DIAN', `${inv.number}${r.accepted ? '' : ' · ' + r.reason}`);
@@ -213,7 +214,8 @@ export class InvoiceService {
   async registerPayment(id: string, amount: number, method: PaymentMethod, receipt: string): Promise<void> {
     const inv = this.getById(id);
     if (!inv) return;
-    this.reservations.addPayment(inv.reservationId, { amount, method, receipt });
+    // Primero el pago en la reserva (de ahí sale el saldo); si falla, no se anota en la factura
+    await this.reservations.addPayment(inv.reservationId, { amount, method, receipt });
     const detail = `${method} · ${new Intl.NumberFormat('es-CO').format(amount)}${receipt ? ' · ' + receipt : ''}`;
     this.upsert(await firstValueFrom(this.http.post<Invoice>(`${this.base}/${id}/pago`, { detail })));
   }

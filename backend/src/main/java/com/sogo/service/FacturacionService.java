@@ -347,7 +347,7 @@ public class FacturacionService {
         List<String> e = new ArrayList<>();
         JsonNode r = configCompleta().path("resolution");
         LocalDate hoy = LocalDate.now();
-        if (r.path("number").asText("").isBlank()) e.add("falta el número de la resolución de facturación (Facturación › Configuración)");
+        if (r.path("number").asText("").isBlank()) e.add("falta el número de la resolución de facturación (Facturación › Impuestos y DIAN)");
         String vd = r.path("validFrom").asText(""), vh = r.path("validTo").asText("");
         if (vd.isEmpty() || vh.isEmpty()) e.add("falta la vigencia de la resolución");
         else if (hoy.isBefore(LocalDate.parse(vd)) || hoy.isAfter(LocalDate.parse(vh))) e.add("la resolución de facturación no está vigente");
@@ -362,6 +362,9 @@ public class FacturacionService {
         if (c.path("docNumber").asText("").isBlank()) e.add("falta el documento del adquiriente");
         if (!EMAIL.matcher(c.path("email").asText("").trim()).matches()) e.add("el correo del adquiriente no es válido");
         if (c.path("address").asText("").isBlank()) e.add("falta la dirección del adquiriente");
+        if (c.path("department").asText("").isBlank() || c.path("city").asText("").isBlank()) e.add("falta el departamento o el municipio del adquiriente");
+        if ("Crédito".equals(b.path("paymentTerm").asText()) && !fechaODefecto(b.path("dueDate").asText("")).isAfter(hoy))
+            e.add("una factura a crédito necesita una fecha de vencimiento posterior a hoy");
 
         BigDecimal total = jdbc.queryForObject("SELECT COALESCE(SUM(cantidad * valor_unitario * (1 - descuento_pct / 100) * (1 + tarifa_impuesto)), 0) FROM factura_lineas WHERE factura_id = ? AND incluida = 1",
                 BigDecimal.class, id);
@@ -396,7 +399,9 @@ public class FacturacionService {
                 Integer usado = jdbc.queryForObject("SELECT COUNT(*) FROM facturas WHERE cufe = ? AND id <> ?", Integer.class, cufe, id);
                 if (usado != null && usado > 0) throw new ResponseStatusException(CONFLICT, "Ese CUFE ya está registrado en otra factura");
                 jdbc.update("UPDATE facturas SET estado_dian = 'Aceptada', cufe = ?, motivo_rechazo = NULL, validada_at = NOW(), actualizado_at = NOW() WHERE id = ?", cufe, id);
-                evento(id, "Aceptada por la DIAN", "CUFE registrado por " + nombre, "ok");
+                // La nota es texto libre (lo que informó el proveedor); el CUFE va aparte, en su columna
+                String nota = b.path("note").asText("").trim();
+                evento(id, "Aceptada por la DIAN", "CUFE registrado por " + nombre + (nota.isEmpty() ? "" : " · " + nota), "ok");
             } else {
                 String motivo = b.path("reason").asText("").trim();
                 if (motivo.length() < 5) throw new ResponseStatusException(BAD_REQUEST, "Escribe el motivo del rechazo que informó la DIAN");
@@ -419,7 +424,8 @@ public class FacturacionService {
             int fin = t.indexOf('&');
             if (fin >= 0) t = t.substring(0, fin);
         }
-        java.util.regex.Matcher m = Pattern.compile("[0-9a-fA-F]{96}").matcher(t);
+        // Solo un bloque de 96 separado del resto; 98 hexadecimales seguidos se rechazan (no se sabe cuáles 96 son)
+        java.util.regex.Matcher m = Pattern.compile("(?<![0-9a-fA-F])[0-9a-fA-F]{96}(?![0-9a-fA-F])").matcher(t);
         if (t.length() > 96 && m.find()) t = m.group();
         return t.toLowerCase();
     }

@@ -19,8 +19,11 @@ INSERT INTO usuarios (email, nombre, apellido, rol, activo, estado, fecha_regist
 VALUES (@correo, @nombre, @apellido, 'ADMIN', 1, 'Activo', NOW(), 'local')
 ON DUPLICATE KEY UPDATE activo = 1, estado = 'Activo';
 
+-- El servidor busca el enlace por su SHA-256 (nunca guarda el token tal cual): se guarda el hash
+-- y el enlace lleva el token original. Antes se guardaba sin cifrar y el enlace nunca funcionaba.
+SET @token = UUID();
 UPDATE usuarios
-SET reset_token = UUID(), reset_token_expiry = NOW() + INTERVAL 24 HOUR
+SET reset_token = SHA2(@token, 256), reset_token_expiry = NOW() + INTERVAL 24 HOUR
 WHERE email = @correo;
 
 -- Rol Administrador de SOGO
@@ -31,7 +34,7 @@ WHERE u.email = @correo;
 -- Enlace para definir la contraseña (ábrelo con SOGO encendido)
 SELECT u.email,
        GROUP_CONCAT(r.nombre) AS roles_sogo,
-       CONCAT('http://localhost:4201/reset?token=', u.reset_token) AS enlace_para_definir_contrasena
+       CONCAT('http://localhost:4201/reset?token=', @token) AS enlace_para_definir_contrasena
 FROM usuarios u
 LEFT JOIN usuario_roles ur ON ur.usuario_id = u.id
 LEFT JOIN roles r ON r.id = ur.rol_id

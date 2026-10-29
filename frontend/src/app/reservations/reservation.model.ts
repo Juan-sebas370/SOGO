@@ -5,6 +5,8 @@ export type LodgingType       = 'Habitación' | 'Piso' | 'Casa completa';
 export type PaymentStatus     = 'Pagado' | 'Parcial' | 'Pendiente';
 // Wompi: pagos en línea hechos desde la página web del hospedaje
 export type PaymentMethod     = 'Efectivo' | 'Nequi' | 'Daviplata' | 'Transferencia' | 'Tarjeta' | 'Wompi';
+/** Métodos con que un huésped paga en recepción (Wompi solo entra por la página web). Una sola lista para todo SOGO. */
+export const GUEST_PAYMENT_METHODS: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
 // Por dónde llegó la reserva (Reportes la usa para la mezcla de canales)
 export type ReservationChannel = 'Web' | 'Directo' | 'Booking' | 'Airbnb' | 'Walk-in';
 export const CHANNELS: ReservationChannel[] = ['Web', 'Directo', 'Booking', 'Airbnb', 'Walk-in'];

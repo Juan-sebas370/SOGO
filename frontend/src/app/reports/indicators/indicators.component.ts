@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -14,10 +15,10 @@ interface Card { def: IndicatorDef; value: number | null; delta: Delta; prev: nu
 @Component({
   selector: 'app-reports-indicators',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, LinesComponent, SparkComponent, DeltaComponent],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink, LinesComponent, SparkComponent, DeltaComponent],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Indicadores de desempeño</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Indicadores de desempeño</h1>
@@ -39,7 +40,7 @@ interface Card { def: IndicatorDef; value: number | null; delta: Delta; prev: nu
       </div>
 
       <div class="in-grid">
-        <article class="in-card" *ngFor="let c of cards" draggable="true" (dragstart)="drag = c.def.key" (dragover)="$event.preventDefault()" (drop)="dropOn(c.def.key)">
+        <article class="in-card" *ngFor="let c of cards" [class.in-ok]="c.meets === true" [class.in-bad]="c.meets === false" draggable="true" (dragstart)="drag = c.def.key" (dragover)="$event.preventDefault()" (drop)="dropOn(c.def.key)">
           <div class="in-card-head"><span>{{ c.def.label }}</span><i class="in-grip" title="Arrastra para reordenar" aria-hidden="true">⠿</i></div>
           <strong class="in-value">{{ c.value === null ? '—' : c.def.format(c.value) }}</strong>
           <div class="in-cmp"><rp-delta [d]="c.delta"></rp-delta><small>{{ cmpShort }} {{ c.prev === null ? '—' : c.def.format(c.prev) }}</small></div>
@@ -97,6 +98,10 @@ interface Card { def: IndicatorDef; value: number | null; delta: Delta; prev: nu
     .in-summary { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
     .in-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; margin-bottom: 18px; }
     .in-card { background: #fff; border: 1px solid #E6EBF2; border-radius: 14px; padding: 14px 15px 12px; cursor: grab; }
+    .in-card { position: relative; overflow: hidden; --acc: #CBD5E1; background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 9%, #fff), #fff 65%); box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .in-card::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--acc); }
+    .in-card.in-ok { --acc: #15803D; } .in-card.in-bad { --acc: #C62828; }
+    .in-value { font-size: 24px !important; letter-spacing: -.01em; }
     .in-card-head { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: #1F2937; }
     .in-grip { font-style: normal; color: #9AA5B4; cursor: grab; user-select: none; }
     .in-value { display: block; font-size: 22px; color: #0A2540; margin: 4px 0 2px; }

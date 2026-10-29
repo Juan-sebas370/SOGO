@@ -6,47 +6,20 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReservationService } from '../reservation.service';
 import {
-  Reservation, ReservationType, LodgingType, ReservationStatus, PaymentMethod, PaymentStatus, isVoid, CHANNELS, splitFullName
+  Reservation, ReservationType, LodgingType, ReservationStatus, PaymentMethod, PaymentStatus, isVoid, CHANNELS, splitFullName,
+  GUEST_PAYMENT_METHODS,
 } from '../reservation.model';
 import { fmtDate, fmtMoney, paymentBadge } from '../reservation-format';
 import { RoomService } from '../../lodging/room.service';
 import { SettingsService } from '../../settings/settings.service';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
-import { CO_DEPARTMENTS, townsOf } from '../../shared/colombia';
-import { COUNTRIES } from '../../tra/tra-catalogs';
+import { CO_DEPARTMENTS, COUNTRY_OPTIONS, Place, townsOf, parsePlace, formatPlace, isColombia } from '../../shared/colombia';
 
 /** Quita espacios de más: "  maría   fernanda " → "maría fernanda". */
 const clean = (v?: string) => (v ?? '').trim().replace(/\s+/g, ' ');
 
 /** El hospedaje solo ofrece alojamiento (no vende comida): toda reserva queda con este plan. */
 const PLAN = 'Solo alojamiento';
-
-/** Lugar de residencia por partes. Se guarda en un solo texto "País - Municipio, Departamento",
- *  que es el formato que leen Facturación y TRA. */
-interface Place { country: string; department: string; town: string; }
-
-const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-
-/** Separa el texto guardado. Acepta también los registros viejos sin país ("Pereira, Risaralda"). */
-function parsePlace(text: string): Place {
-  const raw = (text ?? '').trim();
-  if (!raw) return { country: 'Colombia', department: '', town: '' };
-  const [head, rest] = raw.includes(' - ') ? raw.split(' - ', 2) : ['', raw];
-  const [townRaw = '', depRaw = ''] = rest.split(',').map(s => s.trim());
-  const country = head.trim() || 'Colombia';
-  if (norm(country) !== 'colombia') return { country, department: depRaw, town: townRaw };
-  // En Colombia se ajusta al nombre exacto del catálogo (tildes y mayúsculas)
-  const dep = CO_DEPARTMENTS.find(d => norm(d.name) === norm(depRaw));
-  const town = dep?.towns.find(t => norm(t) === norm(townRaw)) ?? '';
-  return { country: 'Colombia', department: dep?.name ?? '', town };
-}
-
-function formatPlace(p: Place): string {
-  const country = clean(p.country), town = clean(p.town), dep = clean(p.department);
-  const local = [town, dep].filter(Boolean).join(', ');
-  if (!local) return norm(country) === 'colombia' || !country ? '' : country;
-  return `${country || 'Colombia'} - ${local}`;
-}
 
 /** Día siguiente a una fecha YYYY-MM-DD. */
 const nextDay = (iso: string) => { const d = new Date(`${iso}T12:00`); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -328,18 +301,18 @@ export class ReservationFormComponent implements OnInit {
   // Finalizada / Cancelada / No presentada no se asignan a mano desde aquí:
   // salen del flujo de alojamiento o de la acción "Cancelar reserva".
   readonly statusOptions: ReservationStatus[] = ['Pendiente', 'Confirmada'];
-  readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
+  readonly paymentMethods = GUEST_PAYMENT_METHODS;
 
   readonly money = fmtMoney;
   readonly paymentBadge = paymentBadge;
 
   readonly departments = CO_DEPARTMENTS;
-  readonly countries = [...new Set(['Colombia', ...COUNTRIES.map(c => c.name), 'Alemania', 'Brasil', 'Costa Rica', 'Italia', 'Países Bajos', 'Reino Unido', 'República Dominicana', 'Suiza', 'Uruguay', 'Venezuela'])];
+  readonly countries = COUNTRY_OPTIONS;
   place: Place = { country: 'Colombia', department: '', town: '' };
   private placeLoaded = '';
   /** Lugar guardado que no se pudo ubicar en el catálogo (se muestra para elegirlo de nuevo). */
   placeUnmatched = '';
-  get isColombia(): boolean { return norm(this.place.country || 'Colombia') === 'colombia'; }
+  get isColombia(): boolean { return isColombia(this.place.country); }
   get towns(): string[] { return townsOf(this.place.department); }
   onCountry(): void {
     // Al pasar de Colombia a otro país (o al revés) lo elegido ya no aplica

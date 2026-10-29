@@ -7,7 +7,7 @@ import { BillingConfigService } from '../billing-config.service';
 import { Invoice, InvoiceState, EMAIL_RE, computeTotals, lineNet, taxLabel, checkCufe, dianLookupUrl } from '../invoice.model';
 import { DIAN_BADGE, dayMonth } from '../billing-format';
 import { ReservationService } from '../../reservations/reservation.service';
-import { PaymentMethod, lodgingLabel } from '../../reservations/reservation.model';
+import { PaymentMethod, lodgingLabel, GUEST_PAYMENT_METHODS } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
 import { toast } from '../../shared/toast/toast.service';
 import { serverMessage } from '../../shared/toast/notify.interceptor';
@@ -41,6 +41,7 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
       <div><span>Validación DIAN</span><span class="rsv-badge" [ngClass]="dianBadge[inv.dianStatus]">{{ inv.annulment ? 'Anulada' : inv.dianStatus }}</span></div>
       <div><span>Emisión</span><strong>{{ dateTime(inv.issuedAt!) }}</strong></div>
       <div><span>Total</span><strong>{{ money(t.total) }}</strong></div>
+      <div><span>Forma de pago</span><strong>{{ inv.paymentTerm }}</strong><small class="det-sub" *ngIf="inv.paymentTerm === 'Crédito'">Vence el {{ date(inv.dueDate) }}</small></div>
       <div>
         <span>Estado de pago</span>
         <strong [ngClass]="'det-pay--' + state">{{ state }}{{ balance && state !== 'Anulada' ? ' · saldo ' + money(balance) : '' }}</strong>
@@ -88,10 +89,10 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
         </div>
         <p class="bil-hint det-hint" *ngIf="!canSend && !inv.annulment">{{ canShare ? 'El envío se habilita cuando la DIAN acepte la factura.' : 'Tu rol no tiene permiso para descargar ni enviar facturas.' }}</p>
 
-        <!-- Envío por correo (CU07.1) -->
+        <!-- Envío por correo -->
         <section class="bil-card" *ngIf="panel === 'Correo'">
           <div class="bil-card-head">
-            <div><div><h2 class="bil-card-title">Enviar factura por correo</h2><span class="bil-card-sub">CU07.1 · El envío no modifica la factura ni su validez tributaria</span></div></div>
+            <div><div><h2 class="bil-card-title">Enviar factura por correo</h2><span class="bil-card-sub">El envío no modifica la factura ni su validez tributaria</span></div></div>
             <span class="rsv-badge" [ngClass]="emailValid(mail.to) ? 'rsv-badge--ok' : 'rsv-badge--danger'">{{ emailValid(mail.to) ? 'Correo verificado' : 'Correo no válido' }}</span>
           </div>
 
@@ -144,10 +145,10 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
           </ng-container>
         </section>
 
-        <!-- Envío por WhatsApp (CU07.2) -->
+        <!-- Envío por WhatsApp -->
         <section class="bil-card" *ngIf="panel === 'WhatsApp'">
           <div class="bil-card-head">
-            <div><div><h2 class="bil-card-title">Enviar por WhatsApp</h2><span class="bil-card-sub">CU07.2 · Se abre WhatsApp con el mensaje; adjunta el PDF descargado</span></div></div>
+            <div><div><h2 class="bil-card-title">Enviar por WhatsApp</h2><span class="bil-card-sub">Se abre WhatsApp con el mensaje; adjunta el PDF descargado</span></div></div>
           </div>
           <div class="rsv-field">
             <label for="w-phone">Número de WhatsApp *</label>
@@ -225,25 +226,39 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
           <label class="det-choice" [class.active]="!dian.accepted"><input type="radio" name="dian" [checked]="!dian.accepted" (change)="dian.accepted = false"> Rechazada</label>
         </div>
         <ng-container *ngIf="dian.accepted">
-          <div class="det-cufe-help">
-            <strong>¿Qué es el CUFE?</strong>
-            <p>Es el código único que la DIAN le asigna a la factura cuando la acepta: no se inventa ni se calcula en SOGO. Tiene <b>96 caracteres</b> (números 0-9 y letras a-f).</p>
-            <strong>¿Dónde lo encuentro?</strong>
-            <p>En el portal de tu proveedor tecnológico, en el detalle de la factura {{ inv.number }} (campo «CUFE»), en el PDF de la factura debajo del código QR, o en el XML (etiqueta <code>cbc:UUID</code>). También puedes pegar el enlace completo del código QR de la DIAN: SOGO toma el CUFE de ahí.</p>
-          </div>
+          <!-- 1 · El código: no es un mensaje, es el identificador que asigna la DIAN -->
           <div class="rsv-field">
-            <label for="d-cufe">CUFE *</label>
-            <textarea id="d-cufe" rows="3" class="rsv-input det-cufe-input" [class.det-cufe-ok]="cufeCheck.value && !cufeCheck.error"
-                      [class.det-cufe-bad]="!!cufeCheck.error" [(ngModel)]="dian.cufe" spellcheck="false"
-                      placeholder="Pega aquí el CUFE (96 caracteres) o el enlace del código QR de la DIAN"></textarea>
-            <small class="det-help" [class.det-ok]="cufeCheck.value.length === 96 && !cufeCheck.error">
-              {{ cufeCheck.value.length }} de 96 caracteres{{ cufeCheck.value.length === 96 && !cufeCheck.error ? ' · CUFE válido' : '' }}{{ dian.cufe && cufeCheck.value !== dian.cufe ? ' · se quitaron espacios o el enlace' : '' }}</small>
-            <small class="nf-err det-err" *ngIf="cufeCheck.error">{{ cufeCheck.error }}</small>
+            <label for="d-cufe">Código CUFE *</label>
+            <input id="d-cufe" type="text" class="rsv-input det-cufe-input" [class.det-cufe-ok]="cufeValid"
+                   [class.det-cufe-bad]="!!dian.cufe.trim() && !cufeValid && !cufeTyping" [(ngModel)]="dian.cufe"
+                   spellcheck="false" autocomplete="off" placeholder="Pega aquí el código, p. ej. 3a9f0c… (96 letras y números)">
+            <small class="det-help det-ok" *ngIf="cufeValid">✓ CUFE válido</small>
+            <ng-container *ngIf="!cufeValid && dian.cufe.trim()">
+              <div class="det-cufe-msg" *ngIf="looksLikeMessage; else cufeErr">
+                <span>Esto parece un mensaje, no un código. El CUFE es una sola cadena de 96 números y letras (a-f) que asigna la DIAN, sin espacios.</span>
+                <button type="button" class="det-inline-link" (click)="moveToNote()">Pasar este texto a la nota</button>
+              </div>
+              <ng-template #cufeErr><small class="det-help" [class.nf-err]="!cufeTyping">{{ cufeCheck.error || 'Lleva ' + cufeCheck.value.length + ' de 96 caracteres' }}</small></ng-template>
+            </ng-container>
+          </div>
+          <details class="det-cufe-help">
+            <summary>¿Qué es el CUFE y dónde lo encuentro?</summary>
+            <p>Es el <b>código único</b> que la DIAN le da a la factura cuando la acepta; no se escribe ni se calcula en SOGO, se copia. Siempre tiene <b>96 caracteres</b>: números del 0 al 9 y letras de la a a la f.</p>
+            <p>Está en el portal de tu proveedor tecnológico (detalle de la factura {{ inv.number }}, campo «CUFE»), en el PDF de la factura debajo del código QR o en el XML (etiqueta <code>cbc:UUID</code>). También puedes pegar el enlace completo del código QR: SOGO toma el código de ahí.</p>
+          </details>
+
+          <!-- 2 · Lo que se quiera anotar, sin límite de 96 caracteres -->
+          <div class="rsv-field">
+            <label for="d-note">Mensaje o nota del proveedor <span class="det-optional">(opcional)</span></label>
+            <textarea id="d-note" rows="3" class="rsv-input" [(ngModel)]="dian.note" maxlength="500"
+                      placeholder="Ej.: Aceptada sin observaciones · validada el 24/10 en el portal del proveedor"></textarea>
+            <small class="det-help">Queda en el historial de la factura · {{ dian.note.length }} de 500</small>
           </div>
         </ng-container>
         <div class="rsv-field" *ngIf="!dian.accepted">
           <label for="d-reason">Motivo del rechazo *</label>
-          <textarea id="d-reason" rows="3" class="rsv-input" [(ngModel)]="dian.reason" placeholder="Tal como lo informa el proveedor"></textarea>
+          <textarea id="d-reason" rows="4" class="rsv-input" [(ngModel)]="dian.reason" maxlength="500" placeholder="Tal como lo informa el proveedor"></textarea>
+          <small class="det-help">{{ dian.reason.length }} de 500 · después podrás corregir los datos y reenviarla con el mismo número</small>
         </div>
         <p class="nf-err det-err" *ngIf="dianError">{{ dianError }}</p>
         <div class="rsv-modal-footer">
@@ -294,9 +309,10 @@ type SendState = 'draft' | 'sending' | 'sent' | 'error';
 export class InvoiceDetailComponent {
 
   readonly annulReasons = ['Datos del adquiriente incorrectos', 'La factura debía salir a nombre de la empresa', 'Error en los valores o conceptos', 'Servicio no prestado / devolución', 'Otro'];
-  readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
+  readonly paymentMethods = GUEST_PAYMENT_METHODS;
   readonly money = fmtMoney;
   readonly dateTime = fmtDateTime;
+  readonly date = fmtDate;
   readonly dianBadge = DIAN_BADGE;
   readonly net = lineNet;
   readonly tax = taxLabel;
@@ -314,7 +330,7 @@ export class InvoiceDetailComponent {
   annulReason = '';
   payForm?: { amount: number; method: PaymentMethod; receipt: string };
   payError = '';
-  dian?: { accepted: boolean; cufe: string; reason: string };
+  dian?: { accepted: boolean; cufe: string; reason: string; note: string };
   dianError = '';
   busy = false;
 
@@ -371,7 +387,7 @@ export class InvoiceDetailComponent {
 
   emailValid(e: string): boolean { return EMAIL_RE.test(e.trim()); }
 
-  // ── Plantillas de mensaje (Facturación › Configuración) ──
+  // ── Plantillas de mensaje (Facturación › Impuestos y DIAN) ──
   private fill(template: string): string {
     const inv = this.inv!;
     const r = this.reservations.getById(inv.reservationId);
@@ -431,11 +447,24 @@ export class InvoiceDetailComponent {
   /** CUFE limpio (sin espacios ni enlace) y el motivo si no sirve. */
   get cufeCheck(): { value: string; error: string } { return checkCufe(this.dian?.cufe ?? ''); }
   get cufeValid(): boolean { const c = this.cufeCheck; return c.value.length === 96 && !c.error; }
+  /** Aún pegando/escribiendo un código (solo 0-9 y a-f, menos de 96): no se marca en rojo todavía. */
+  get cufeTyping(): boolean { const c = this.cufeCheck; return !c.error && c.value.length < 96; }
+  /** Texto con palabras (espacios y letras que no van en un CUFE): alguien escribió un mensaje en el campo del código. */
+  get looksLikeMessage(): boolean {
+    const raw = (this.dian?.cufe ?? '').trim();
+    return /\s/.test(raw) && /[g-zñáéíóú]/i.test(raw) && !/documentkey=/i.test(raw);
+  }
+  moveToNote(): void {
+    const d = this.dian!;
+    d.note = [d.note.trim(), d.cufe.trim()].filter(Boolean).join(' · ').slice(0, 500);
+    d.cufe = '';
+    setTimeout(() => document.getElementById('d-cufe')?.focus());
+  }
   readonly lookup = dianLookupUrl;
 
   openDian(): void {
     this.dianError = '';
-    this.dian = { accepted: true, cufe: '', reason: '' };
+    this.dian = { accepted: true, cufe: '', reason: '', note: '' };
   }
 
   async saveDian(): Promise<void> {
@@ -445,7 +474,7 @@ export class InvoiceDetailComponent {
     if (!d.accepted && d.reason.trim().length < 5) { this.dianError = 'Escribe el motivo del rechazo.'; return; }
     this.busy = true;
     try {
-      await this.svc.registerDianResponse(this.inv!.id, d.accepted ? { accepted: true, cufe } : { accepted: false, reason: d.reason.trim() });
+      await this.svc.registerDianResponse(this.inv!.id, d.accepted ? { accepted: true, cufe, note: d.note.trim() } : { accepted: false, reason: d.reason.trim() });
       toast.success(d.accepted ? 'Factura aceptada por la DIAN' : 'Rechazo registrado', this.inv!.number);
       this.dian = undefined;
       this.resetMessages();

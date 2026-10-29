@@ -1,4 +1,5 @@
 import { Component, ElementRef, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -18,10 +19,10 @@ const PALETTE = [COLORS.blue, COLORS.amber, COLORS.purple, COLORS.gray, COLORS.g
 @Component({
   selector: 'app-reports-charts',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, BarsComponent, LinesComponent, DonutComponent],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink, BarsComponent, LinesComponent, DonutComponent],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Gráficos estadísticos</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Gráficos estadísticos</h1>
@@ -93,10 +94,6 @@ const PALETTE = [COLORS.blue, COLORS.amber, COLORS.purple, COLORS.gray, COLORS.g
     </section>
   </div>
 
-  <section class="kit-card ch-foot">
-    <span class="ch-foot-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14"/></svg></span>
-    <div><strong>Descargar gráfico</strong><p>Cada gráfico se puede descargar como imagen (PNG) o documento (PDF) con título, período y fecha de generación.</p></div>
-  </section>
   `,
   styles: [`
     .ch-bar { align-items: center; }

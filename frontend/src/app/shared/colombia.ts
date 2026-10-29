@@ -41,3 +41,46 @@ export const CO_DEPARTMENTS: Department[] = [
 
 /** Municipios de un departamento (vacío si no existe). */
 export const townsOf = (department: string): string[] => CO_DEPARTMENTS.find(d => d.name === department)?.towns ?? [];
+
+// ── Lugar por partes (reservas, facturas) ──
+
+/** País, departamento (o estado/provincia) y municipio (o ciudad). */
+export interface Place { country: string; department: string; town: string; }
+
+/** Países que se ofrecen en las listas; se puede escribir cualquier otro. */
+export const COUNTRY_OPTIONS = [
+  'Colombia', 'Alemania', 'Argentina', 'Brasil', 'Canadá', 'Chile', 'Costa Rica', 'Ecuador', 'España', 'Estados Unidos',
+  'Francia', 'Italia', 'México', 'Países Bajos', 'Panamá', 'Perú', 'Reino Unido', 'República Dominicana', 'Suiza', 'Uruguay', 'Venezuela',
+];
+
+export const normPlace = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const tidy = (v?: string) => (v ?? '').trim().replace(/\s+/g, ' ');
+export const isColombia = (country: string) => normPlace(country || 'Colombia') === 'colombia';
+
+/** Departamento y municipio ajustados al nombre exacto del catálogo (tildes y mayúsculas); '' si no están. */
+export function matchColombia(department: string, town: string): { department: string; town: string } {
+  const dep = CO_DEPARTMENTS.find(d => normPlace(d.name) === normPlace(department));
+  return { department: dep?.name ?? '', town: dep?.towns.find(t => normPlace(t) === normPlace(town)) ?? '' };
+}
+
+/**
+ * Separa el texto guardado "País - Municipio, Departamento" (formato de reservas, Facturación y TRA).
+ * Acepta también los registros viejos sin país ("Pereira, Risaralda").
+ */
+export function parsePlace(text: string): Place {
+  const raw = (text ?? '').trim();
+  if (!raw) return { country: 'Colombia', department: '', town: '' };
+  const [head, rest] = raw.includes(' - ') ? raw.split(' - ', 2) : ['', raw];
+  const [townRaw = '', depRaw = ''] = rest.split(',').map(s => s.trim());
+  const country = head.trim() || 'Colombia';
+  if (!isColombia(country)) return { country, department: depRaw, town: townRaw };
+  return { country: 'Colombia', ...matchColombia(depRaw, townRaw) };
+}
+
+/** Une el lugar en el texto que se guarda; '' si no hay nada más que Colombia. */
+export function formatPlace(p: Place): string {
+  const country = tidy(p.country), town = tidy(p.town), dep = tidy(p.department);
+  const local = [town, dep].filter(Boolean).join(', ');
+  if (!local) return isColombia(country) || !country ? '' : country;
+  return `${country || 'Colombia'} - ${local}`;
+}

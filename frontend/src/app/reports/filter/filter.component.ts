@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -53,10 +54,10 @@ const PAGE = 6;
 @Component({
   selector: 'app-reports-filter',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Filtrar información</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Filtrar información estadística</h1>

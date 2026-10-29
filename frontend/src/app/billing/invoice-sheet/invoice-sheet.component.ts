@@ -7,6 +7,9 @@ import { ReservationService } from '../../reservations/reservation.service';
 import { lodgingLabel, totalGuests, lastPayment } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
 import { amountInWords } from '../number-words';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { dianLookupUrl } from '../invoice.model';
+import { qrSvg } from '../qr';
 
 /**
  * Representación gráfica de la factura (lo que recibe el huésped).
@@ -44,7 +47,7 @@ import { amountInWords } from '../number-words';
       Autorización de numeración DIAN n.º {{ resolution.number }} · Prefijo {{ resolution.prefix }} ·
       Rango {{ resolution.from }} a {{ resolution.to }}{{ resolution.validFrom && resolution.validTo ? ' · Vigencia ' + date(resolution.validFrom!) + ' – ' + date(resolution.validTo!) : '' }}
     </p>
-    <ng-template #noResolution><p class="sheet-resolution sheet-missing">Resolución de facturación DIAN pendiente de configurar (Facturación › Configuración).</p></ng-template>
+    <ng-template #noResolution><p class="sheet-resolution sheet-missing">Resolución de facturación DIAN pendiente de configurar (Facturación › Impuestos y DIAN).</p></ng-template>
 
     <div class="sheet-boxes">
       <section>
@@ -52,13 +55,13 @@ import { amountInWords } from '../number-words';
         <strong>{{ invoice.buyer.name || '—' }}</strong>
         <span>{{ invoice.buyer.docType }} {{ invoice.buyer.docNumber }}{{ invoice.buyer.dv ? '-' + invoice.buyer.dv : '' }} · Persona {{ invoice.buyer.personType.toLowerCase() }}</span>
         <span>{{ invoice.buyer.fiscalResponsibility }}</span>
-        <span>{{ invoice.buyer.address || '[Dirección]' }} · {{ invoice.buyer.city }}, {{ invoice.buyer.department }}</span>
+        <span>{{ join(invoice.buyer.address || '[Dirección]', place) }}</span>
         <span>{{ invoice.buyer.email }}{{ invoice.buyer.phone ? ' · ' + invoice.buyer.phone : '' }}</span>
       </section>
       <section *ngIf="reservation as r">
         <h4>Estadía</h4>
         <strong>Reserva {{ r.code }}</strong>
-        <span>{{ lodging(r) }} · habitaciones {{ r.rooms.join(', ') }}</span>
+        <span>{{ lodging(r) }}{{ r.rooms.length && r.lodgingType !== 'Habitación' ? ' · habitaciones ' + r.rooms.join(', ') : '' }}</span>
         <span>Entrada {{ date(r.checkIn) }} · Salida {{ date(r.checkOut) }} · {{ r.nights ? r.nights + ' noche' + (r.nights === 1 ? '' : 's') : 'Pasadía' }}</span>
         <span>{{ guests(r) }} huéspedes · {{ r.reservationType }}</span>
       </section>
@@ -89,7 +92,7 @@ import { amountInWords } from '../number-words';
         </section>
         <section>
           <h4>Forma de pago</h4>
-          <p>{{ invoice.paymentTerm }}{{ advance ? ' · Anticipo ' + money(advance) + (advanceInfo ? ' (' + advanceInfo + ')' : '') : '' }}</p>
+          <p>{{ invoice.paymentTerm }}{{ invoice.paymentTerm === 'Crédito' ? ' · vence el ' + date(invoice.dueDate) : '' }}{{ advance ? ' · Anticipo ' + money(advance) + (advanceInfo ? ' (' + advanceInfo + ')' : '') : '' }}</p>
           <p>Saldo por pagar: {{ money(balance) }}</p>
         </section>
       </div>
@@ -103,7 +106,8 @@ import { amountInWords } from '../number-words';
     </div>
 
     <footer class="sheet-foot">
-      <span class="sheet-qr">{{ invoice.cufe ? 'QR de consulta DIAN' : 'Código QR al emitir' }}</span>
+      <a *ngIf="qr; else noQr" class="sheet-qr sheet-qr--real" [href]="lookupUrl" target="_blank" rel="noopener" title="Consultar la factura en la DIAN" [innerHTML]="qr"></a>
+      <ng-template #noQr><span class="sheet-qr">Código QR cuando la DIAN la acepte</span></ng-template>
       <div>
         <p><strong>CUFE:</strong> <code>{{ invoice.cufe || 'Se asigna cuando la DIAN valida la factura' }}</code></p>
         <p>Representación gráfica de la factura electrónica de venta.</p>
@@ -127,7 +131,20 @@ export class InvoiceSheetComponent {
   readonly discount = lineDiscount;
   readonly tax = taxLabel;
 
-  constructor(private invoices: InvoiceService, private config: BillingConfigService, private reservations: ReservationService) {}
+  constructor(private invoices: InvoiceService, private config: BillingConfigService, private reservations: ReservationService, private sanitizer: DomSanitizer) {}
+
+  /** QR con la dirección de consulta de la DIAN (la exige la representación gráfica); solo cuando ya hay CUFE. */
+  private qrFor = '';
+  private qrCache: SafeHtml | null = null;
+  get lookupUrl(): string { return dianLookupUrl(this.invoice.cufe ?? ''); }
+  get qr(): SafeHtml | null {
+    const cufe = this.invoice.cufe ?? '';
+    if (!cufe) return null;
+    // El SVG sale de qrSvg (solo rectángulos) con el CUFE validado: se puede insertar tal cual
+    if (this.qrFor !== cufe) { this.qrFor = cufe; this.qrCache = this.sanitizer.bypassSecurityTrustHtml(qrSvg(this.lookupUrl, 110)); }
+    return this.qrCache;
+  }
+  get place(): string { const b = this.invoice.buyer; return [b.city, b.department, b.country && b.country !== 'Colombia' ? b.country : ''].filter(Boolean).join(', '); }
 
   get issuer() { return this.config.get().issuer; }
   get resolution() { return this.config.get().resolution; }

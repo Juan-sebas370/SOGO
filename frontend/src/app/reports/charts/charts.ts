@@ -30,16 +30,18 @@ const textWidth = (s: string) => s.length * 6.1;
     <g *ngFor="let l of labels; let i = index" (mouseenter)="hover = i" style="cursor: default">
       <rect [attr.x]="LEFT + i * group" y="0" [attr.width]="group" [attr.height]="base" fill="transparent"/>
       <ng-container *ngFor="let s of series; let k = index">
-        <rect *ngIf="s.values[i] !== null" [attr.x]="bx(i, k)" [attr.y]="y(s.values[i] || 0)" [attr.width]="bw" [attr.height]="base - y(s.values[i] || 0)" rx="4"
-              [attr.fill]="s.colors?.[i] || s.color" [attr.opacity]="hover >= 0 && hover !== i ? 0.55 : 1"><title>{{ s.name }} · {{ l }}: {{ valueLabel(s.values[i] || 0) }}</title></rect>
+        <path *ngIf="s.values[i] !== null && (s.values[i] || 0) > 0" [attr.d]="barPath(bx(i, k), y(s.values[i] || 0))"
+              [attr.fill]="s.colors?.[i] || s.color" [attr.opacity]="hover >= 0 && hover !== i ? 0.5 : 1"><title>{{ s.name }} · {{ l }}: {{ valueLabel(s.values[i] || 0) }}</title></path>
         <text *ngIf="showValue(i, k)" [attr.x]="bx(i, k) + bw / 2" [attr.y]="y(s.values[i] || 0) - 6" font-size="10.5" font-weight="700" [attr.fill]="C.navy" text-anchor="middle">{{ valueLabel(s.values[i] || 0) }}</text>
       </ng-container>
       <text [attr.x]="LEFT + i * group + group / 2" [attr.y]="height - 8" font-size="11" [attr.fill]="C.text" text-anchor="middle">{{ l }}</text>
     </g>
+    <line [attr.x1]="LEFT" [attr.x2]="W - RIGHT" [attr.y1]="base" [attr.y2]="base" stroke="#C9D3E0" stroke-width="1"/>
     <g *ngFor="let g of goals">
       <line [attr.x1]="LEFT" [attr.x2]="W - RIGHT" [attr.y1]="y(g.value)" [attr.y2]="y(g.value)" [attr.stroke]="g.color" stroke-width="2" stroke-dasharray="6 5"/>
     </g>
-    <g *ngIf="hover >= 0 && tooltip" pointer-events="none">
+    <text *ngIf="empty" [attr.x]="(W + LEFT - RIGHT) / 2" [attr.y]="(TOP + base) / 2" font-size="12.5" [attr.fill]="C.text" text-anchor="middle">Sin datos en el período</text>
+    <g *ngIf="hover >= 0 && tooltip && !empty" pointer-events="none">
       <rect [attr.x]="tipX" [attr.y]="TOP - 20" [attr.width]="tipW" [attr.height]="18 + tipLines.length * 15" rx="7" [attr.fill]="C.navy"/>
       <text *ngFor="let t of tipLines; let j = index" [attr.x]="tipX + 10" [attr.y]="TOP - 3 + j * 15" font-size="11" [attr.font-weight]="j === 0 ? 700 : 400" fill="#FFFFFF">{{ t }}</text>
     </g>
@@ -78,9 +80,15 @@ export class BarsComponent implements OnChanges {
     return LEFT + i * this.group + (this.group - total) / 2 + k * (this.bw + 6);
   }
   y(v: number): number { return this.base - Math.max(0, v) / this.max * (this.base - TOP); }
+  /** Barra apoyada en la base con la punta redondeada (4 px), sin redondear la parte de abajo. */
+  barPath(x: number, top: number): string {
+    const w = this.bw, h = this.base - top, r = Math.min(4, h, w / 2);
+    return `M${x},${this.base}V${top + r}Q${x},${top} ${x + r},${top}H${x + w - r}Q${x + w},${top} ${x + w},${top + r}V${this.base}Z`;
+  }
+  get empty(): boolean { return !this.series.some(s => s.values.some(v => (v ?? 0) > 0)); }
   showValue(i: number, k: number): boolean {
     const v = this.series[k].values[i];
-    if (v === null || this.valuesShown === 'none') return false;
+    if (v === null || v <= 0 || this.valuesShown === 'none') return false;
     if (this.valuesShown === 'all') return true;
     if (this.valuesShown === 'last') return i === this.labels.length - 1;
     return v === Math.max(...this.series[k].values.map(x => x ?? 0));
@@ -98,16 +106,22 @@ export class BarsComponent implements OnChanges {
   imports: [CommonModule],
   template: `
   <svg [attr.viewBox]="'0 0 ' + W + ' ' + height" width="100%" [attr.font-family]="font" role="img" [attr.aria-label]="aria" (mouseleave)="hover = -1">
+    <defs>
+      <linearGradient *ngFor="let s of series; let k = index" [attr.id]="uid + '-' + k" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" [attr.stop-color]="s.color" stop-opacity="0.26"/><stop offset="100%" [attr.stop-color]="s.color" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
     <g *ngFor="let t of ticks">
       <line [attr.x1]="LEFT" [attr.x2]="W - RIGHT" [attr.y1]="y(t)" [attr.y2]="y(t)" [attr.stroke]="C.grid" stroke-width="1"/>
       <text [attr.x]="LEFT - 8" [attr.y]="y(t) + 4" font-size="10" [attr.fill]="C.text" text-anchor="end">{{ tick(t) }}</text>
     </g>
+    <text *ngIf="empty" [attr.x]="(W + LEFT - RIGHT) / 2" [attr.y]="(TOP + base) / 2" font-size="12.5" [attr.fill]="C.text" text-anchor="middle">Sin datos en el período</text>
     <line [attr.x1]="LEFT" [attr.x2]="W - RIGHT" [attr.y1]="base" [attr.y2]="base" stroke="#C9D3E0" stroke-width="1"/>
     <g *ngFor="let l of labels; let i = index">
       <text *ngIf="showLabel(i)" [attr.x]="x(i)" [attr.y]="height - 8" font-size="11" [attr.fill]="C.text" text-anchor="middle">{{ l }}</text>
     </g>
-    <g *ngFor="let s of series">
-      <path *ngIf="s.area" [attr.d]="areaPath(s)" [attr.fill]="s.color" fill-opacity="0.1" stroke="none"/>
+    <g *ngFor="let s of series; let k = index">
+      <path *ngIf="s.area" [attr.d]="areaPath(s)" [attr.fill]="'url(#' + uid + '-' + k + ')'" stroke="none"/>
       <path [attr.d]="linePath(s)" fill="none" [attr.stroke]="s.color" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" [attr.stroke-dasharray]="s.dashed ? '7 6' : null"/>
       <ng-container *ngIf="points">
         <ng-container *ngFor="let v of s.values; let i = index">
@@ -160,6 +174,9 @@ export class LinesComponent implements OnChanges {
     this.max = a.max; this.ticks = a.ticks;
   }
 
+  /** Id único para los degradados (puede haber varios gráficos en la misma página). */
+  readonly uid = 'rpl' + Math.random().toString(36).slice(2, 8);
+  get empty(): boolean { return !this.series.some(s => s.values.some(v => v !== null && v !== 0)); }
   get base(): number { return this.height - BOTTOM; }
   get step(): number { return (W - LEFT - RIGHT - 20) / Math.max(1, this.labels.length - 1); }
   x(i: number): number { return this.labels.length === 1 ? (W + LEFT - RIGHT) / 2 : LEFT + 10 + i * this.step; }
@@ -198,10 +215,13 @@ export class LinesComponent implements OnChanges {
   imports: [CommonModule],
   template: `
   <svg viewBox="0 0 200 200" width="100%" [attr.font-family]="font" role="img" [attr.aria-label]="aria">
-    <circle cx="100" cy="100" r="74" fill="none" [attr.stroke]="C.grid" stroke-width="30"/>
-    <path *ngFor="let a of arcs" [attr.d]="a.d" fill="none" [attr.stroke]="a.color" stroke-width="30"><title>{{ a.label }}</title></path>
-    <text x="100" y="98" font-size="22" font-weight="700" [attr.fill]="C.navy" text-anchor="middle">{{ center }}</text>
-    <text x="100" y="118" font-size="11" [attr.fill]="C.text" text-anchor="middle">{{ sub }}</text>
+    <circle cx="100" cy="100" r="74" fill="none" [attr.stroke]="C.grid" stroke-width="24"/>
+    <path *ngFor="let a of arcs" [attr.d]="a.d" fill="none" [attr.stroke]="a.color" stroke-width="24" stroke-linecap="butt"><title>{{ a.label }}</title></path>
+    <ng-container *ngIf="arcs.length; else noData">
+      <text x="100" y="98" font-size="22" font-weight="700" [attr.fill]="C.navy" text-anchor="middle">{{ center }}</text>
+      <text x="100" y="118" font-size="11" [attr.fill]="C.text" text-anchor="middle">{{ sub }}</text>
+    </ng-container>
+    <ng-template #noData><text x="100" y="104" font-size="12" [attr.fill]="C.text" text-anchor="middle">Sin datos</text></ng-template>
   </svg>`,
 })
 export class DonutComponent implements OnChanges {

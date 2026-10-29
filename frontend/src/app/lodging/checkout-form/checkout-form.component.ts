@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ReservationService } from '../../reservations/reservation.service';
-import { Reservation, PaymentMethod, isInHouse, lodgingLabel, totalAmount, paidAmount } from '../../reservations/reservation.model';
+import { Reservation, PaymentMethod, isInHouse, lodgingLabel, totalAmount, paidAmount, GUEST_PAYMENT_METHODS } from '../../reservations/reservation.model';
 import { fmtDate, fmtDateTime, fmtMoney } from '../../reservations/reservation-format';
 import { RoomService } from '../room.service';
 import { InvoiceService } from '../../billing/invoice.service';
@@ -168,7 +168,7 @@ interface DamageLine {
 })
 export class CheckoutFormComponent {
 
-  readonly paymentMethods: PaymentMethod[] = ['Efectivo', 'Nequi', 'Daviplata', 'Transferencia', 'Tarjeta'];
+  readonly paymentMethods = GUEST_PAYMENT_METHODS;
   readonly date = fmtDate;
   readonly dateTime = fmtDateTime;
   readonly money = fmtMoney;

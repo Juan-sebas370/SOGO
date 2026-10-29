@@ -153,3 +153,7 @@ h4 {
   .sheet { border: none; box-shadow: none; padding: 0; }
   .sheet-lines th, .sheet-totals .sheet-total { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* QR real de consulta en la DIAN (cuando ya hay CUFE) */
+.sheet-qr--real { width: 96px; height: 96px; border: none; padding: 0; }
+.sheet-qr--real ::ng-deep svg { width: 100%; height: 100%; display: block; }

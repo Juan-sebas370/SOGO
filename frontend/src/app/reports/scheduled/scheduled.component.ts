@@ -1,4 +1,5 @@
 import { Component, OnDestroy } from '@angular/core';
+import { ReportNavComponent } from '../report-nav.component';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -18,10 +19,10 @@ const HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).
 @Component({
   selector: 'app-reports-scheduled',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [ReportNavComponent, CommonModule, FormsModule, RouterLink],
   styleUrls: ['../../shared/styles/page-kit.css', '../../shared/styles/kit.css', '../reports.css'],
   template: `
-  <nav class="kit-crumb" aria-label="Ruta"><a routerLink="/dashboard/reports">Reportes</a><span>/</span><span>Reportes programados</span></nav>
+  <rp-nav></rp-nav>
   <header class="kit-head">
     <div>
       <h1 class="kit-title">Reportes automáticos</h1>

@@ -274,12 +274,12 @@ button.bil-kpi:hover { box-shadow: 0 8px 20px rgba(15,23,42,0.08); }
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;   /* etiqueta arriba; el valor (select o texto) va debajo, sin cruzarse */
   flex: 0 1 180px;
   min-width: 140px;
   height: 46px;
   margin: 0;
-  padding: 0 34px 0 12px;
+  padding: 6px 34px 0 12px;
   border: 1px solid #D5DEEA;
   border-radius: 8px;
   background: #fff;
@@ -289,14 +289,14 @@ button.bil-kpi:hover { box-shadow: 0 8px 20px rgba(15,23,42,0.08); }
 }
 
 .bil-select:focus-within { border-color: #0B6FD0; box-shadow: 0 0 0 3px rgba(11,111,208,0.12); }
-.bil-select-label { font-size: 11px; font-weight: 500; color: #4B5563; pointer-events: none; }
+.bil-select-label { font-size: 11px; line-height: 14px; font-weight: 500; color: #4B5563; pointer-events: none; }
 .bil-select-value { font-size: 12px; color: #1F2937; white-space: nowrap; }
 
 .bil-select select {
   position: absolute;
   inset: 0;
   width: 100%;
-  padding: 20px 34px 4px 12px;
+  padding: 18px 34px 0 12px;
   appearance: none;
   -webkit-appearance: none;
   border: none;
@@ -319,7 +319,6 @@ button.bil-kpi:hover { box-shadow: 0 8px 20px rgba(15,23,42,0.08); }
   pointer-events: none;
 }
 
-.bil-select--label-only .bil-select-label { margin-bottom: 16px; }
 
 .bil-clear {
   display: inline-flex;

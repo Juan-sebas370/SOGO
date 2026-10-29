@@ -6,7 +6,7 @@
 
 .det-status {
   display: grid;
-  grid-template-columns: auto repeat(4, auto) minmax(0, 1fr);
+  grid-template-columns: auto repeat(5, auto) minmax(0, 1fr);
   gap: 22px;
   align-items: center;
   margin-bottom: 16px;
@@ -213,3 +213,11 @@
 .det-cufe-ok { border-color: #16A34A !important; }
 .det-cufe-bad { border-color: #DC2626 !important; }
 .det-ok { color: #15803D; font-weight: 600; }
+
+.det-sub { font-size: 11.5px; color: #6B7280; }
+
+/* Respuesta de la DIAN: el código (CUFE) y la nota van separados */
+.det-cufe-help summary { cursor: pointer; font-weight: 600; color: #0B6FD0; }
+.det-cufe-help[open] summary { margin-bottom: 6px; }
+.det-cufe-msg { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 6px; padding: 8px 10px; border-radius: 8px; background: #FEF6E4; font-size: 12px; color: #92400E; }
+.det-optional { font-weight: 400; color: #9CA3AF; }

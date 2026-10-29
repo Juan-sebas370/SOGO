@@ -6,6 +6,7 @@ import {
   BillingConfigService, BillingConfig, TaxRule, TaxConcept, ACTION_PERMISSION, BillingAction,
 } from '../billing-config.service';
 import { InvoiceService } from '../invoice.service';
+import { EXTRA_CATEGORIES } from '../invoice.model';
 import { UsersService } from '../../users/users.service';
 import { fmtDate } from '../../reservations/reservation-format';
 import { serverMessage } from '../../shared/toast/notify.interceptor';
@@ -19,11 +20,11 @@ const PERM_LABEL: Record<string, string> = { view: 'Ver', create: 'Crear', edit:
   styleUrls: ['./billing-settings.component.css'],
   template: `
   <nav class="bil-crumb" aria-label="Ruta">
-    <a routerLink="/dashboard/billing">Facturación</a><span>/</span><span>Configuración</span>
+    <a routerLink="/dashboard/billing">Facturación</a><span>/</span><span>Impuestos y DIAN</span>
   </nav>
   <header class="bil-head">
     <div>
-      <h1 class="bil-title">Configuración de facturación</h1>
+      <h1 class="bil-title">Impuestos y DIAN</h1>
       <p class="bil-subtitle">Resolución DIAN, proveedor tecnológico, tarifas de impuestos y mensaje al huésped. Se guarda en la base de datos.</p>
     </div>
     <div class="bil-head-actions">
@@ -242,7 +243,7 @@ export class BillingSettingsComponent {
 
   readonly environments: BillingConfig['provider']['environment'][] = ['Habilitación', 'Producción'];
   readonly actions = Object.keys(ACTION_PERMISSION) as BillingAction[];
-  readonly concepts: TaxConcept[] = ['Alojamiento', 'Alojamiento · extranjero no residente', 'Daños y faltantes', 'Eventos y pasadías', 'Lavandería', 'Otro'];
+  readonly concepts: TaxConcept[] = ['Alojamiento', 'Alojamiento · extranjero no residente', ...EXTRA_CATEGORIES];
   readonly date = fmtDate;
 
   c: BillingConfig;

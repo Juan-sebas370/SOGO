@@ -163,7 +163,7 @@ describe('Reportes', () => {
       await go(t.href);
       await page.waitForSelector('h1');
       assert.equal(await page.$eval('rp-nav .rpn-tab.on', a => a.textContent.trim()), t.label, `La pestaña activa no es ${t.label}`);
-      await shot(`09-reportes-${String(i + 1).padStart(2, '0')}-${t.label.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]+/g, '-')}`);
+      await shot(`09-reportes-${String(i + 1).padStart(2, '0')}-${t.label.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z]+/g, '-')}`);
     }
   });
 });

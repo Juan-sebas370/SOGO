@@ -75,6 +75,15 @@ public class PermisoService {
         return false;
     }
 
+    /** Exige al menos uno de los permisos, escritos "Módulo:acción" (para datos que comparten varios módulos). */
+    public void exigirAlguno(String login, String... permisos) {
+        for (String p : permisos) {
+            String[] partes = p.split(":", 2);
+            if (puede(login, partes[0], partes[1])) return;
+        }
+        throw new ResponseStatusException(FORBIDDEN, "Tu rol no tiene permiso para esta acción");
+    }
+
     public void exigir(String login, String modulo, String accion) {
         if (!puede(login, modulo, accion)) {
             throw new ResponseStatusException(FORBIDDEN, "Tu rol no tiene permiso para esta acción (" + modulo + ")");

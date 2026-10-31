@@ -6,7 +6,7 @@
 -- Cambia 'CAMBIA_ESTA_CLAVE' por una contraseña segura antes de ejecutar,
 -- y NO guardes este archivo con la clave real (ni lo subas a GitHub).
 -- =====================================================================
-CREATE USER IF NOT EXISTS 'sogo_user'@'localhost' IDENTIFIED BY 'Admin123';
+CREATE USER IF NOT EXISTS 'sogo_user'@'localhost' IDENTIFIED BY 'CAMBIA_ESTA_CLAVE';
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON hotel_sebastian.* TO 'sogo_user'@'localhost';
 

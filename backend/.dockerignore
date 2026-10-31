@@ -1,0 +1,5 @@
+# Nunca entran a la imagen: claves locales, respaldos con datos personales y compilados
+*.local.properties
+respaldos/
+target/
+*.log

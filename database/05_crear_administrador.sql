@@ -13,6 +13,7 @@ USE hotel_sebastian;
 SET @correo   = 'sebastian@gmail.com';
 SET @nombre   = 'Juan Sebastián';
 SET @apellido = 'Pinilla';
+SET @sogo_url = 'http://localhost:4201';
 
 -- Cuenta (si el correo ya existe, solo se le genera un enlace nuevo)
 INSERT INTO usuarios (email, nombre, apellido, rol, activo, estado, fecha_registro, proveedor_auth)
@@ -34,7 +35,7 @@ WHERE u.email = @correo;
 -- Enlace para definir la contraseña (ábrelo con SOGO encendido)
 SELECT u.email,
        GROUP_CONCAT(r.nombre) AS roles_sogo,
-       CONCAT('http://localhost:4201/reset?token=', @token) AS enlace_para_definir_contrasena
+       CONCAT(@sogo_url, '/reset?token=', @token) AS enlace_para_definir_contrasena
 FROM usuarios u
 LEFT JOIN usuario_roles ur ON ur.usuario_id = u.id
 LEFT JOIN roles r ON r.id = ur.rol_id

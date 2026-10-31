@@ -20,6 +20,7 @@ SQL hotel_sebastian < "$ROOT/hotel_sebastian.sql"                       # tablas
 for f in $(ls "$ROOT/database" | grep -E '^(0[1-9]|1[0-9]|2[0-9])' | grep -v -E '^(01b|22)_' | sort); do
   SQL hotel_sebastian < "$ROOT/database/$f" > /dev/null                # 01b es reparación manual; 22 es verificación
 done
+SQL -e "ALTER USER 'sogo_user'@'localhost' IDENTIFIED BY 'Admin123'"          # clave solo de este MySQL de prueba
 SQL hotel_sebastian < "$ROOT/pruebas/datos/habitaciones_prueba.sql"     # habitaciones (en producción las crea la web)
 SQL hotel_sebastian < "$ROOT/database/04_datos_habitaciones.sql" > /dev/null
 

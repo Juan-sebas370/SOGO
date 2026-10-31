@@ -60,7 +60,8 @@ ALTER TABLE consumos
 DROP TEMPORARY TABLE IF EXISTS carga_dotacion;
 CREATE TEMPORARY TABLE carga_dotacion (
   categoria VARCHAR(50), nombre VARCHAR(150), precio DECIMAL(14,2), cobrable TINYINT, orden INT,
-  piso1 DECIMAL(10,2), piso2 DECIMAL(10,2), anual1 DECIMAL(10,2), anual2 DECIMAL(10,2)
+  piso1 DECIMAL(10,2), piso2 DECIMAL(10,2), anual1 DECIMAL(10,2), anual2 DECIMAL(10,2),
+  PRIMARY KEY (categoria, nombre)   -- Aiven exige clave primaria también en las tablas temporales
 );
 
 INSERT INTO carga_dotacion VALUES

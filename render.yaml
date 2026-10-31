@@ -1,0 +1,62 @@
+# Blueprint de Render para SOGO (https://render.com/docs/blueprint-spec).
+# En Render: New → Blueprint → elegir este repositorio. Los valores con sync: false se piden
+# en el panel al crear el servicio; nunca se guardan aquí. Pasos completos en DESPLIEGUE.md.
+services:
+  - type: web
+    name: sogo-api
+    runtime: docker
+    # Plan gratis: se duerme sin uso, así que no correrían respaldos, reportes ni alertas, y
+    # pierde los archivos al reiniciar. Para operar de verdad, cámbialo a "starter" (de pago).
+    plan: free
+    branch: integracion-sogo
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    healthCheckPath: /api/auth/oauth-providers
+    autoDeploy: true
+    envVars:
+      - key: FRONTEND_URL
+        value: https://sogo.hospedajesebastianfilandia.com
+      - key: MAIL_FROM
+        value: reservas@hospedajesebastianfilandia.com
+      # La base es compartida con la página web y el plan de Aiven limita las conexiones
+      - key: DB_POOL_SIZE
+        value: "5"
+      # Clave propia de SOGO: no reutilizar la de la página web
+      - key: JWT_SECRET
+        generateValue: true
+      # jdbc:mysql://HOST:PUERTO/BASE?sslMode=REQUIRED&serverTimezone=America/Bogota&characterEncoding=UTF-8
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+
+  - type: web
+    name: sogo-web
+    runtime: static
+    branch: integracion-sogo
+    rootDir: frontend
+    buildCommand: npm ci && npx ng build
+    staticPublishPath: dist/frontend
+    buildFilter:
+      paths:
+        - frontend/**
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+    # Las rutas de Angular (/dashboard/...) responden index.html
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

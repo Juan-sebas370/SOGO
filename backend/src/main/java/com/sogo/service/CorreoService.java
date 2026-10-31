@@ -30,6 +30,10 @@ public class CorreoService {
     private String clave;
     @Value("${spring.mail.host:}")
     private String servidor;
+    @Value("${resend.api-key:}")
+    private String resendKey;
+    @Value("${app.mail.from:}")
+    private String direccionResend;
     @Value("${app.mail.from-name:}")
     private String nombreRemitente;
 
@@ -42,18 +46,22 @@ public class CorreoService {
         this.config = config;
     }
 
-    /** ¿Hay cuenta y contraseña de aplicación en correo.local.properties? */
+    private boolean usaResend() { return resendKey != null && !resendKey.isBlank(); }
+
+    /** ¿Hay Resend (producción) o cuenta y contraseña de aplicación en correo.local.properties? */
     public boolean configurado() {
+        if (usaResend()) return sender.getIfAvailable() != null && direccionResend != null && !direccionResend.isBlank();
         return sender.getIfAvailable() != null && cuenta != null && !cuenta.isBlank()
                 && clave != null && !clave.isBlank() && !clave.startsWith("PEGA_AQUI");
     }
 
-    public String cuenta() { return cuenta == null ? "" : cuenta; }
-    public String servidor() { return servidor == null ? "" : servidor; }
+    public String cuenta() { return usaResend() ? direccionResend : cuenta == null ? "" : cuenta; }
+    public String servidor() { return usaResend() ? "Resend" : servidor == null ? "" : servidor; }
     public String ultimoError() { return ultimoError; }
 
     /** Qué falta para poder enviar (vacío si está todo). */
     public String faltante() {
+        if (usaResend()) return direccionResend == null || direccionResend.isBlank() ? "Falta definir MAIL_FROM con una dirección del dominio verificado en Resend" : "";
         if (cuenta == null || cuenta.isBlank()) return "Falta crear backend/correo.local.properties con la cuenta de Gmail del hospedaje";
         if (clave == null || clave.isBlank() || clave.startsWith("PEGA_AQUI")) return "Falta pegar la contraseña de aplicación de Gmail en backend/correo.local.properties y reiniciar el backend";
         return "";
@@ -129,7 +137,7 @@ public class CorreoService {
         try {
             MimeMessage m = mail.createMimeMessage();
             MimeMessageHelper h = new MimeMessageHelper(m, true, StandardCharsets.UTF_8.name());
-            h.setFrom(new InternetAddress(cuenta, remitente(), StandardCharsets.UTF_8.name()));
+            h.setFrom(new InternetAddress(cuenta(), remitente(), StandardCharsets.UTF_8.name()));
             h.setTo(InternetAddress.parse(para));
             h.setSubject(asunto);
             h.setText(texto, html);

@@ -41,7 +41,7 @@ public class AlertaCorreoService {
         def("expiry", "Producto próximo a vencer", "Inventarios › Alertas");
         def("reservations", "Nueva reserva o cancelación", "Reservas");
         def("arrivals", "Llegadas y salidas del día", "Alojamiento");
-        def("tra", "TRA pendiente de envío", "TRA");
+        def("tra", "TRA y SIRE pendientes de reporte", "TRA");
         def("invoice-rejected", "Factura rechazada por la DIAN", "Facturación");
         def("invoice-range", "Rango de facturación al 80 %", "Facturación › Impuestos y DIAN");
         def("payroll", "Nómina lista para aprobar", "Nómina");
@@ -126,6 +126,53 @@ public class AlertaCorreoService {
         return enviados;
     }
 
+    // ── SIRE (Migración Colombia) ──────────────────────
+    /** Documentos de extranjeros: el huésped se reporta al SIRE (igual que FOREIGN_DOCUMENTS del frontend). */
+    private static final Set<String> DOC_EXTRANJERO = Set.of("CE", "PA", "PEP", "PPT", "DNI");
+    /** Hora del recordatorio de los movimientos del día: el plazo del SIRE vence a medianoche. */
+    public static final LocalTime HORA_SIRE = LocalTime.of(18, 0);
+
+    /**
+     * Entradas y salidas de extranjeros sin marcar como reportadas en TRA › SIRE (de los últimos 30 días).
+     * A las 7:00 avisa las vencidas (días anteriores); a las 18:00, las de hoy que siguen pendientes.
+     */
+    void sire(LocalDateTime ahora, List<ReservaDto> rs, List<Item> out) {
+        LocalDate hoy = ahora.toLocalDate();
+        String dia = hoy.toString(), mes = hoy.minusDays(30).toString();
+        Map<String, JsonNode> datos = new HashMap<>();
+        jdbc.query("SELECT reserva_id, CAST(datos AS CHAR) AS datos FROM tra_registros WHERE datos IS NOT NULL", rs2 -> {
+            try { datos.put(String.valueOf(rs2.getLong(1)), json.readTree(rs2.getString("datos"))); } catch (Exception ignored) { /* un registro ilegible no detiene la alerta */ }
+        });
+        List<String> vencidos = new ArrayList<>(), deHoy = new ArrayList<>();
+        rs.forEach(r -> {
+            JsonNode d = datos.get(r.id());
+            if (d == null) return;
+            Set<String> reportados = new HashSet<>();
+            d.path("sire").path("reports").forEach(x -> reportados.add(x.path("guestId").asText() + "|" + x.path("type").asText()));
+            d.path("guests").forEach(g -> {
+                if (!DOC_EXTRANJERO.contains(g.path("docType").asText())) return;
+                String nombre = (g.path("firstNames").asText("") + " " + g.path("lastNames").asText("")).trim();
+                Map<String, String> movs = new LinkedHashMap<>();
+                movs.put("ENTRADA", r.checkedInAt());
+                movs.put("SALIDA", r.checkedOutAt());
+                movs.forEach((tipo, cuando) -> {
+                    if (cuando == null || cuando.length() < 10 || reportados.contains(g.path("id").asText() + "|" + tipo)) return;
+                    String fecha = cuando.substring(0, 10);
+                    if (fecha.compareTo(mes) < 0) return;
+                    String linea = (tipo.equals("ENTRADA") ? "Entrada" : "Salida") + " " + fecha(fecha) + " · " + nombre + " · " + r.code();
+                    if (fecha.compareTo(dia) < 0) vencidos.add(linea); else if (fecha.equals(dia)) deHoy.add(linea);
+                });
+            });
+        });
+        LocalTime hora = ahora.toLocalTime();
+        if (!vencidos.isEmpty() && !hora.isBefore(HORA_RESUMEN))
+            out.add(new Item("sire-" + dia, vencidos.size() + " movimiento(s) de extranjeros VENCIDOS sin reportar al SIRE (Migración Colombia):\n"
+                    + String.join("\n", vencidos) + "\nRepórtalos en el portal SIRE y márcalos en SOGO › TRA › SIRE · Extranjeros."));
+        if (!deHoy.isEmpty() && !hora.isBefore(HORA_SIRE))
+            out.add(new Item("sire-hoy-" + dia, deHoy.size() + " movimiento(s) de extranjeros de hoy sin reportar al SIRE (el plazo vence a medianoche):\n"
+                    + String.join("\n", deHoy) + "\nRepórtalos en el portal SIRE y márcalos en SOGO › TRA › SIRE · Extranjeros."));
+    }
+
     // ── Qué hay para avisar en cada alerta ─────────────
 
     List<Item> detectar(String key, LocalDateTime ahora, String desde, List<ReservaDto> rs) {
@@ -175,6 +222,7 @@ public class AlertaCorreoService {
                         p.add(r.code() + " · " + r.guestName() + " · llegó el " + fecha(r.checkIn()) + " · " + estadoTra(estados.get(r.id())));
                 });
                 if (!p.isEmpty()) out.add(new Item("tra-" + dia, p.size() + " TRA sin reportar al MinCIT:\n" + String.join("\n", p)));
+                sire(ahora, rs, out);
             }
             case "invoice-rejected" -> jdbc.query("SELECT id, numero, comprador, motivo_rechazo FROM facturas WHERE estado_dian = 'Rechazada' AND nota_credito IS NULL", rs2 -> {
                 String comprador = texto(rs2.getString("comprador"), "name");

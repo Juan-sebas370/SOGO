@@ -105,7 +105,7 @@ export class SettingsService {
     { key: 'expiry', label: 'Producto próximo a vencer', module: 'Inventarios', inApp: true, email: true, recipients: ['Aux. Nómina e Inventario'] },
     { key: 'reservations', label: 'Nueva reserva o cancelación', module: 'Reservas', inApp: true, email: false, recipients: ['Recepcionista'] },
     { key: 'arrivals', label: 'Llegadas y salidas del día', module: 'Alojamiento', inApp: true, email: true, recipients: ['Recepcionista'] },
-    { key: 'tra', label: 'TRA pendiente de envío', module: 'TRA', inApp: true, email: true, recipients: ['Recepcionista', 'Administrador'] },
+    { key: 'tra', label: 'TRA y SIRE pendientes de reporte', module: 'TRA', inApp: true, email: true, recipients: ['Recepcionista', 'Administrador'] },
     { key: 'invoice-rejected', label: 'Factura rechazada por la DIAN', module: 'Facturación', inApp: true, email: true, recipients: ['Administrador', 'Contador'] },
     { key: 'invoice-range', label: 'Rango de facturación al 80 %', module: 'Facturación', inApp: true, email: true, recipients: ['Administrador'] },
     { key: 'payroll', label: 'Nómina lista para aprobar', module: 'Nómina', inApp: true, email: true, recipients: ['Administrador'] },

@@ -3,178 +3,92 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, Router } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { AuthShellComponent } from '../auth-shell/auth-shell.component';
 
 @Component({
   selector: 'app-reset',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, AuthShellComponent],
   styleUrls: ['./reset.component.css'],
   template: `
-  <div class="login-wrap">
-
-    <!-- ═══════════════════════════════════════════
-         PANEL IZQUIERDO — igual que login y recuperación
-    ════════════════════════════════════════════ -->
-    <section class="left-panel">
-      <div class="left-background"></div>
-      <div class="left-content">
+  <app-auth-shell promo="Tu seguridad es nuestra prioridad.">
+    <div class="auth-vista">
+      <a routerLink="/" class="auth-volver">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        Volver
+      </a>
+      <div class="auth-icono-grande">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="16" r="1.3" fill="#fff"/></svg>
       </div>
-    </section>
+      <h1 class="auth-titulo">Restablecer contraseña</h1>
+      <p class="auth-texto">Crea tu nueva contraseña siguiendo los requisitos de seguridad.</p>
 
-    <!-- ═══════════════════════════════════════════
-         PANEL DERECHO — Restablecer contraseña
-    ════════════════════════════════════════════ -->
-    <section class="login-panel">
-      <div class="login-panel-inner">
-
-        <!-- Logo -->
-        <div class="login-brand">
-          <img src="/assets/brand/sogo-fondo-claro.png" alt="SOGO" class="brand-logo">
-        </div>
-
-        <!-- Ícono candado -->
-        <div class="recover-icon-wrap">
-          <svg class="recover-icon" viewBox="0 0 24 24">
-            <rect x="3" y="11" width="18" height="9" rx="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-        </div>
-
-        <!-- Título -->
-        <h2 class="recover-title">Restablecer contraseña</h2>
-        <p class="recover-desc">
-          Introduce tu nueva contraseña siguiendo<br>
-          los requisitos de seguridad.
-        </p>
-
-        <!-- Formulario -->
-        <div class="login-form">
-
-          <!-- Nueva contraseña -->
-          <div class="form-field">
-            <label for="rs-pass">Nueva contraseña</label>
-            <div class="input-wrapper">
-              <span class="input-icon">
-                <svg class="icon-svg" viewBox="0 0 24 24">
-                  <rect x="3" y="11" width="18" height="9" rx="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </span>
-              <input
-                id="rs-pass"
-                [type]="showPassword ? 'text' : 'password'"
-                [(ngModel)]="password"
-                (ngModelChange)="onPasswordChange($event)"
-                placeholder="Nueva contraseña"
-                autocomplete="new-password"
-              >
-              <button
-                class="icon-button"
-                type="button"
-                (click)="showPassword = !showPassword"
-                [attr.aria-label]="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
-              >
-                <svg *ngIf="!showPassword" class="icon-svg" viewBox="0 0 24 24">
-                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-                <svg *ngIf="showPassword" class="icon-svg" viewBox="0 0 24 24">
-                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19C5 19 1 12 1 12a18.07 18.07 0 0 1 5.06-5.94"/>
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Confirmar contraseña -->
-          <div class="form-field">
-            <label for="rs-confirm">Confirmar nueva contraseña</label>
-            <div class="input-wrapper">
-              <span class="input-icon">
-                <svg class="icon-svg" viewBox="0 0 24 24">
-                  <rect x="3" y="11" width="18" height="9" rx="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </span>
-              <input
-                id="rs-confirm"
-                [type]="showConfirm ? 'text' : 'password'"
-                [(ngModel)]="confirm"
-                placeholder="Confirmar contraseña"
-                autocomplete="new-password"
-              >
-              <button
-                class="icon-button"
-                type="button"
-                (click)="showConfirm = !showConfirm"
-                [attr.aria-label]="showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'"
-              >
-                <svg *ngIf="!showConfirm" class="icon-svg" viewBox="0 0 24 24">
-                  <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-                <svg *ngIf="showConfirm" class="icon-svg" viewBox="0 0 24 24">
-                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19C5 19 1 12 1 12a18.07 18.07 0 0 1 5.06-5.94"/>
-                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Requisitos de contraseña -->
-          <div class="rules">
-            <p class="rules-title">La contraseña debe contener</p>
-            <div class="rule" [class.valid]="rules.length">
-              <span class="rule-dot"></span>Mínimo 8 caracteres
-            </div>
-            <div class="rule" [class.valid]="rules.upper">
-              <span class="rule-dot"></span>Una letra mayúscula
-            </div>
-            <div class="rule" [class.valid]="rules.lower">
-              <span class="rule-dot"></span>Una letra minúscula
-            </div>
-            <div class="rule" [class.valid]="rules.number">
-              <span class="rule-dot"></span>Un número
-            </div>
-          </div>
-
-          <!-- Botón guardar -->
-          <button class="primary" type="button" (click)="submit()">
-            <svg viewBox="0 0 24 24">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17 21 17 13 7 13 7 21"/>
-              <polyline points="7 3 7 8 15 8"/>
-            </svg>
-            Guardar nueva contraseña
+      <form (ngSubmit)="submit()">
+        <!-- Nueva contraseña -->
+        <div class="auth-campo auth-campo--espaciado">
+          <input
+            id="rs-pass"
+            name="password"
+            [type]="showPassword ? 'text' : 'password'"
+            [(ngModel)]="password"
+            (ngModelChange)="onPasswordChange($event)"
+            placeholder="Nueva contraseña"
+            aria-label="Nueva contraseña"
+            autocomplete="new-password"
+          >
+          <button
+            class="auth-ico"
+            type="button"
+            (click)="showPassword = !showPassword"
+            [attr.aria-label]="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          >
+            <svg *ngIf="!showPassword" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>
+            <svg *ngIf="showPassword" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 5C5 5 1 12 1 12s4 7 11 7 11-7 11-7-4-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
           </button>
-
-          <!-- Mensajes -->
-          <div class="msg msg--success" *ngIf="message && !error" role="status">{{ message }}</div>
-          <div class="msg" *ngIf="error" role="alert">{{ error }}</div>
-
-        </div><!-- /login-form -->
-
-        <!-- Footer -->
-        <div class="login-footer">
-          <p class="login-footer-promo">
-            <svg viewBox="0 0 24 24">
-              <rect x="3" y="11" width="18" height="9" rx="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            Tu seguridad es nuestra prioridad.
-          </p>
-          <p class="login-footer-copy">
-            © 2024 Hospedaje Sebastián Filandia.<br>
-            Todos los derechos reservados.
-          </p>
         </div>
 
-      </div><!-- /login-panel-inner -->
-    </section>
+        <!-- Confirmar contraseña -->
+        <div class="auth-campo auth-campo--espaciado">
+          <input
+            id="rs-confirm"
+            name="confirm"
+            [type]="showConfirm ? 'text' : 'password'"
+            [(ngModel)]="confirm"
+            placeholder="Confirmar contraseña"
+            aria-label="Confirmar nueva contraseña"
+            autocomplete="new-password"
+          >
+          <button
+            class="auth-ico"
+            type="button"
+            (click)="showConfirm = !showConfirm"
+            [attr.aria-label]="showConfirm ? 'Ocultar confirmación' : 'Mostrar confirmación'"
+          >
+            <svg *ngIf="!showConfirm" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>
+            <svg *ngIf="showConfirm" width="20" height="20" viewBox="0 0 24 24" fill="#fff"><path d="M12 5C5 5 1 12 1 12s4 7 11 7 11-7 11-7-4-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          </button>
+        </div>
 
-  </div>
+        <!-- Requisitos de contraseña -->
+        <div class="auth-reglas">
+          <p class="auth-reglas-titulo">La contraseña debe contener</p>
+          <div class="auth-regla" [class.auth-regla--ok]="rules.length"><span class="auth-regla-punto"></span>Mínimo 8 caracteres</div>
+          <div class="auth-regla" [class.auth-regla--ok]="rules.upper"><span class="auth-regla-punto"></span>Una letra mayúscula</div>
+          <div class="auth-regla" [class.auth-regla--ok]="rules.lower"><span class="auth-regla-punto"></span>Una letra minúscula</div>
+          <div class="auth-regla" [class.auth-regla--ok]="rules.number"><span class="auth-regla-punto"></span>Un número</div>
+        </div>
+
+        <button class="auth-btn" [class.auth-btn--cargando]="loading" type="submit" [disabled]="loading">
+          <span class="auth-btn-contenido">Guardar nueva contraseña</span>
+          <span class="auth-spinner"></span>
+        </button>
+      </form>
+
+      <!-- Mensajes -->
+      <div class="auth-msg auth-msg--ok" *ngIf="message && !error" role="status">{{ message }}</div>
+      <div class="auth-msg" *ngIf="error" role="alert">{{ error }}</div>
+    </div>
+  </app-auth-shell>
   `
 })
 export class ResetComponent {
@@ -185,6 +99,7 @@ export class ResetComponent {
   token        = '';
   showPassword = false;
   showConfirm  = false;
+  loading      = false;
 
   rules = { length: false, upper: false, lower: false, number: false };
 
@@ -212,12 +127,14 @@ export class ResetComponent {
       return;
     }
 
+    this.loading = true;
     this.auth.doReset(this.token, this.password).subscribe({
       next:  (r: any) => {
         this.message = r.message || 'Contraseña actualizada correctamente.';
         setTimeout(() => this.router.navigate(['/']), 1500);
       },
       error: (e) => {
+        this.loading = false;
         this.error = e.error?.error === 'invalid or expired token'
           ? 'El enlace ya se usó o venció (dura 1 hora). Pide uno nuevo en «¿Olvidaste tu contraseña?».'
           : 'No se pudo actualizar la contraseña.';

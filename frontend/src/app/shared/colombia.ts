@@ -1,6 +1,9 @@
 // Departamentos y municipios de Colombia (DIVIPOLA del DANE, datos.gov.co, conjunto gdxc-w37w).
 // 33 departamentos · 1122 municipios. Solo nombres: el código DANE no se usa en reservas.
 
+import { WORLD_COUNTRIES, FREQUENT_COUNTRY_IDS } from './countries';
+import { SearchOption } from './search-select/search-select.component';
+
 export interface Department { name: string; towns: string[]; }
 
 export const CO_DEPARTMENTS: Department[] = [
@@ -47,11 +50,33 @@ export const townsOf = (department: string): string[] => CO_DEPARTMENTS.find(d =
 /** País, departamento (o estado/provincia) y municipio (o ciudad). */
 export interface Place { country: string; department: string; town: string; }
 
-/** Países que se ofrecen en las listas; se puede escribir cualquier otro. */
-export const COUNTRY_OPTIONS = [
-  'Colombia', 'Alemania', 'Argentina', 'Brasil', 'Canadá', 'Chile', 'Costa Rica', 'Ecuador', 'España', 'Estados Unidos',
-  'Francia', 'Italia', 'México', 'Países Bajos', 'Panamá', 'Perú', 'Reino Unido', 'República Dominicana', 'Suiza', 'Uruguay', 'Venezuela',
-];
+/** Países que se ofrecen en las listas (todos los del mundo); se puede escribir cualquier otro. */
+export const COUNTRY_OPTIONS = WORLD_COUNTRIES.map(c => c.name);
+
+// ── Opciones para los buscadores (app-search-select) ──
+/** País por nombre (así se guarda en reservas y facturas); se encuentra también por código ISO. */
+export const COUNTRY_SEARCH: SearchOption[] = WORLD_COUNTRIES.map(c => ({ value: c.name, label: c.name, hint: c.id, keywords: c.isoNumeric }));
+export const FREQUENT_COUNTRY_NAMES = FREQUENT_COUNTRY_IDS.map(id => WORLD_COUNTRIES.find(c => c.id === id)!.name);
+export const DEPARTMENT_SEARCH: SearchOption[] = CO_DEPARTMENTS.map(d => ({ value: d.name, label: d.name }));
+
+/** Clave de un municipio en el buscador: el mismo nombre existe en varios departamentos. */
+export const townKey = (department: string, town: string) => town ? `${town}|${department}` : '';
+export function splitTownKey(key: string): { department: string; town: string } {
+  const [town = '', department = ''] = (key ?? '').split('|');
+  return { department, town };
+}
+
+/** Todos los municipios, con su departamento de pista: «filan» → Filandia · Quindío. */
+export const TOWN_SEARCH: SearchOption[] = CO_DEPARTMENTS
+  .flatMap(d => d.towns.map(t => ({ value: townKey(d.name, t), label: t, hint: d.name })))
+  .sort((a, b) => a.label.localeCompare(b.label, 'es'));
+const townSearchCache = new Map<string, SearchOption[]>();
+/** Municipios de un departamento, o de todo el país si aún no se eligió departamento. */
+export function townSearch(department: string): SearchOption[] {
+  if (!department) return TOWN_SEARCH;
+  if (!townSearchCache.has(department)) townSearchCache.set(department, TOWN_SEARCH.filter(o => o.hint === department));
+  return townSearchCache.get(department)!;
+}
 
 export const normPlace = (s: string) => (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const tidy = (v?: string) => (v ?? '').trim().replace(/\s+/g, ' ');

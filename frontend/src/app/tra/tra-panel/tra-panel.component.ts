@@ -8,11 +8,12 @@ import { isoDate } from '../../shared/date-utils';
 import { downloadCsvFile } from '../../shared/documents';
 import { TraService, TraRow } from '../tra.service';
 import { TraGuest, TravelData, TraSend, TraViewStatus, LodgingUnit } from '../tra.model';
-import { country, city, reasonLabel, docTypeLabel } from '../tra-catalogs';
+import { country, city, cityLabel, reasonLabel, docTypeLabel } from '../tra-catalogs';
 import {
   Progress, progressOf, travelOf, inherits, isComplete, guestIssues, isMinor, needsSire, roleLabel, fullName,
   unitIdsFor, totalValue, statusLabel, statusBadge, sendBadge, fmtDoc, fmtStamp
 } from '../tra-rules';
+import { isDue } from '../sire-rules';
 
 type Tab = 'TODAS' | 'BORRADOR' | 'LISTA_PARA_ENVIO' | 'REQUIERE_CORRECCION' | 'ERROR' | 'REPORTADA' | 'NO_APLICA';
 type View = 'reserva' | 'principales' | 'acompanantes';
@@ -73,6 +74,10 @@ const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
       </div>
     </div>
     <div class="rsv-header-actions">
+      <a routerLink="/dashboard/tra/sire" class="rsv-btn rsv-btn--outline" title="Reporte de extranjeros a Migración Colombia">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        SIRE<span class="tp-sire-count" *ngIf="sireDue">{{ sireDue }}</span>
+      </a>
       <a routerLink="/dashboard/tra/config" class="rsv-btn rsv-btn--outline">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         Configuración TRA
@@ -356,9 +361,12 @@ const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
       </ng-container>
     </td>
     <td [class.tp-inh]="g.inherited">
-      <ng-container *ngIf="cityOf(g.travel.originCity) as c; else dash">
+      <ng-container *ngIf="cityOf(g.travel.originCity) as c; else cityText">
         <span class="tra-mono">{{ c.daneCode || c.id }}</span><span class="tra-sub">{{ c.name }}</span>
       </ng-container>
+      <ng-template #cityText>
+        <ng-container *ngIf="g.travel.originCity; else dash">{{ g.travel.originCity }}<span class="tra-sub">exterior · sin código DANE</span></ng-container>
+      </ng-template>
     </td>
     <td class="tp-nowrap" [class.tp-inh]="g.inherited">{{ date(g.travel.checkIn) }}</td>
     <td class="tp-nowrap" [class.tp-inh]="g.inherited">{{ date(g.travel.checkOut) }}</td>
@@ -434,7 +442,7 @@ export class TraPanelComponent {
   readonly docLabel = docTypeLabel;
   readonly countryOf = country;
   readonly cityOf = city;
-  readonly cityName = (id: string) => city(id)?.name ?? '—';
+  readonly cityName = (id: string) => cityLabel(id) || '—';
 
   readonly today = isoDate(0);
   readonly monthName = new Date().toLocaleDateString('es-CO', { month: 'short' }).replace('.', '');
@@ -473,9 +481,13 @@ export class TraPanelComponent {
       this.all = rows.map(row => this.toPanelRow(row));
       this.months = this.monthOptions();
       this.computeKpis();
+      this.sireDue = this.svc.sireMovements().flatMap(x => x.movements).filter(isDue).length;
       this.apply(false);
     });
   }
+
+  /** Movimientos de extranjeros por reportar al SIRE (entradas y salidas ya ocurridas). */
+  sireDue = 0;
 
   // ── Construcción de filas ──
   private toPanelRow(row: TraRow): PanelRow {
@@ -669,8 +681,8 @@ export class TraPanelComponent {
         const t = g.travel;
         return [
           p.r.code, g.role, this.principalName(p), g.guest.docType, g.guest.docNumber, g.guest.firstNames, g.guest.lastNames,
-          country(t.residenceCountry)?.isoNumeric ?? '', country(t.residenceCountry)?.name ?? '', t.residenceCity, city(t.residenceCity)?.name ?? '',
-          t.originCity, city(t.originCity)?.name ?? '', fmtDate(t.checkIn), fmtDate(t.checkOut), g.rooms, g.unitName,
+          country(t.residenceCountry)?.isoNumeric ?? '', country(t.residenceCountry)?.name ?? '', t.residenceCity, cityLabel(t.residenceCity),
+          t.originCity, cityLabel(t.originCity), fmtDate(t.checkIn), fmtDate(t.checkOut), g.rooms, g.unitName,
           g.guest.role === 'PRINCIPAL' ? p.total : '', t.reasonId ?? '', reasonLabel(t.reasonId),
           g.inherited ? 'Sí' : 'No', statusLabel(p.row.status), g.send?.status ?? '', g.send?.httpStatus ?? '', g.send?.mincitId ?? '',
         ];

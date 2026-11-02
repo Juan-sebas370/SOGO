@@ -156,3 +156,7 @@
   .tr-show-sm { display: block; }
   .tr-minor { flex-wrap: wrap; }
 }
+
+/* Dato que SOGO propuso a partir de lo ya registrado */
+.tr-predicted { color: #0B6FD0 !important; font-size: 11px; line-height: 1.4; }
+.tr-predicted::before { content: '✦ '; }

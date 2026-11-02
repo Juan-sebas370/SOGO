@@ -2,6 +2,10 @@ import {
   DocumentType, TravelReason, Country, City, AccommodationType, LodgingUnit, Relationship, UnitType
 } from './tra.model';
 import { ROOMS, FLOORS, roomsOnFloor, summaryOf } from '../lodging/house';
+import { SearchOption } from '../shared/search-select/search-select.component';
+import { WORLD_COUNTRIES, FREQUENT_COUNTRY_IDS } from '../shared/countries';
+import { CO_DEPARTMENTS } from '../shared/colombia';
+import { DANE_CODES } from '../shared/divipola';
 
 // Catálogos de la TRA. Ningún campo codificado es texto libre: el frontend
 // muestra la descripción y el backend guarda y envía el código.
@@ -30,42 +34,19 @@ export const TRAVEL_REASONS: TravelReason[] = [
   { id: 8, label: 'Visita a familiares y amigos' },
 ];
 
-// Código ISO 3166-1 numérico
-export const COUNTRIES: Country[] = [
-  { id: 'CO', name: 'Colombia',       isoNumeric: '170' },
-  { id: 'AR', name: 'Argentina',      isoNumeric: '032' },
-  { id: 'CA', name: 'Canadá',         isoNumeric: '124' },
-  { id: 'CL', name: 'Chile',          isoNumeric: '152' },
-  { id: 'EC', name: 'Ecuador',        isoNumeric: '218' },
-  { id: 'ES', name: 'España',         isoNumeric: '724' },
-  { id: 'US', name: 'Estados Unidos', isoNumeric: '840' },
-  { id: 'FR', name: 'Francia',        isoNumeric: '250' },
-  { id: 'MX', name: 'México',         isoNumeric: '484' },
-  { id: 'PA', name: 'Panamá',         isoNumeric: '591' },
-  { id: 'PE', name: 'Perú',           isoNumeric: '604' },
-];
+// Países: la lista mundial compartida (shared/countries.ts), con su código ISO numérico.
+export const COUNTRIES: Country[] = WORLD_COUNTRIES;
 
-// Ciudades de Colombia con código DANE (Divipola). Las del exterior no tienen
-// código DANE: el código que exige la integración queda pendiente del manual.
+// Municipios de Colombia: los 1.122 de la DIVIPOLA con su código DANE (shared/colombia.ts +
+// shared/divipola.ts). Las ciudades del exterior no tienen código DANE: se escriben, y estas
+// son solo sugerencias del buscador.
+const CO_CITIES: City[] = CO_DEPARTMENTS.flatMap(d => d.towns.map(town => {
+  const code = DANE_CODES[`${town}|${d.name}`];
+  return { id: code, daneCode: code, name: town, department: d.name, countryId: 'CO' };
+}));
+
 export const CITIES: City[] = [
-  { id: '11001', daneCode: '11001', name: 'Bogotá',        department: 'Bogotá D.C.',     countryId: 'CO' },
-  { id: '05001', daneCode: '05001', name: 'Medellín',      department: 'Antioquia',       countryId: 'CO' },
-  { id: '76001', daneCode: '76001', name: 'Cali',          department: 'Valle del Cauca', countryId: 'CO' },
-  { id: '08001', daneCode: '08001', name: 'Barranquilla',  department: 'Atlántico',       countryId: 'CO' },
-  { id: '13001', daneCode: '13001', name: 'Cartagena',     department: 'Bolívar',         countryId: 'CO' },
-  { id: '68001', daneCode: '68001', name: 'Bucaramanga',   department: 'Santander',       countryId: 'CO' },
-  { id: '66001', daneCode: '66001', name: 'Pereira',       department: 'Risaralda',       countryId: 'CO' },
-  { id: '66170', daneCode: '66170', name: 'Dosquebradas',  department: 'Risaralda',       countryId: 'CO' },
-  { id: '63001', daneCode: '63001', name: 'Armenia',       department: 'Quindío',         countryId: 'CO' },
-  { id: '63130', daneCode: '63130', name: 'Calarcá',       department: 'Quindío',         countryId: 'CO' },
-  { id: '63272', daneCode: '63272', name: 'Filandia',      department: 'Quindío',         countryId: 'CO' },
-  { id: '63690', daneCode: '63690', name: 'Salento',       department: 'Quindío',         countryId: 'CO' },
-  { id: '17001', daneCode: '17001', name: 'Manizales',     department: 'Caldas',          countryId: 'CO' },
-  { id: '73001', daneCode: '73001', name: 'Ibagué',        department: 'Tolima',          countryId: 'CO' },
-  { id: '41001', daneCode: '41001', name: 'Neiva',         department: 'Huila',           countryId: 'CO' },
-  { id: '52001', daneCode: '52001', name: 'Pasto',         department: 'Nariño',          countryId: 'CO' },
-  { id: '47001', daneCode: '47001', name: 'Santa Marta',   department: 'Magdalena',       countryId: 'CO' },
-  { id: '54001', daneCode: '54001', name: 'Cúcuta',        department: 'Norte de Santander', countryId: 'CO' },
+  ...CO_CITIES,
   { id: 'US-MIA', name: 'Miami',            department: 'Florida',        countryId: 'US' },
   { id: 'US-NYC', name: 'Nueva York',       department: 'Nueva York',     countryId: 'US' },
   { id: 'ES-MAD', name: 'Madrid',           department: 'Madrid',         countryId: 'ES' },
@@ -75,6 +56,12 @@ export const CITIES: City[] = [
   { id: 'AR-BUE', name: 'Buenos Aires',     department: 'Buenos Aires',   countryId: 'AR' },
   { id: 'CA-TOR', name: 'Toronto',          department: 'Ontario',        countryId: 'CA' },
 ];
+
+/** Nombres cortos con que la gente escribe su ciudad: «cali» encuentra Santiago de Cali. */
+const CITY_ALIASES: Record<string, string> = {
+  '76001': 'Cali', '13001': 'Cartagena', '54001': 'Cúcuta', '11001': 'Bogotá', '13468': 'Mompox Mompós',
+  '52835': 'Tumaco', '76111': 'Buga', '05042': 'Santa Fe de Antioquia', '25843': 'Ubaté',
+};
 
 // Numeral 3.1: el catálogo oficial está pendiente de cargar. Estos valores son
 // provisionales para poder operar; se reemplazan al sincronizar con MinCIT.
@@ -114,4 +101,23 @@ export const reasonLabel   = (id: number | null) => TRAVEL_REASONS.find(r => r.i
 export const country       = (id: string) => COUNTRIES.find(c => c.id === id);
 export const city          = (id: string) => CITIES.find(c => c.id === id);
 export const citiesOf      = (countryId: string) => CITIES.filter(c => c.countryId === countryId);
+/** Colombia elige la ciudad del catálogo DANE; en el exterior se escribe (no hay código DANE). */
+export const usesCityCatalog = (countryId: string) => countryId === 'CO';
+/** Nombre de la ciudad: la del catálogo, o el texto escrito para una ciudad del exterior. */
+export const cityLabel     = (value: string) => city(value)?.name ?? value;
+
+// ── Opciones para los buscadores (app-search-select) ──
+/** País con su código ISO de pista; también se encuentra por el código numérico ("152" → Chile). */
+export const COUNTRY_OPTIONS: SearchOption[] = COUNTRIES.map(c => ({ value: c.id, label: c.name, hint: c.id, keywords: c.isoNumeric }));
+/** Los que más llegan: salen primero con el campo vacío. */
+export const FREQUENT_COUNTRIES = FREQUENT_COUNTRY_IDS;
+
+const cityOptionsCache = new Map<string, SearchOption[]>();
+/** Ciudades del catálogo de un país, con el departamento de pista. */
+export function cityOptions(countryId: string): SearchOption[] {
+  if (!cityOptionsCache.has(countryId)) {
+    cityOptionsCache.set(countryId, citiesOf(countryId).map(c => ({ value: c.id, label: c.name, hint: c.department, keywords: `${c.daneCode ?? ''} ${CITY_ALIASES[c.id] ?? ''} ${c.department}` })));
+  }
+  return cityOptionsCache.get(countryId)!;
+}
 export const accommodationLabel = (code: string) => ACCOMMODATION_TYPES.find(a => a.code === code)?.label ?? '';

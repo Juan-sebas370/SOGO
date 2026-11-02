@@ -1,142 +1,133 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+
+const ESPERA_REENVIO = 30;
 
 @Component({
   selector: 'app-reset-request',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, AuthShellComponent],
   styleUrls: ['./reset-request.component.css'],
   template: `
-  <div class="login-wrap">
+  <app-auth-shell promo="Tu seguridad es nuestra prioridad.">
 
-    <!-- ═══════════════════════════════════════════
-         PANEL IZQUIERDO — igual que el login
-    ════════════════════════════════════════════ -->
-    <section class="left-panel">
-      <div class="left-background"></div>
-      <div class="left-content">
+    <!-- Recuperar contraseña -->
+    <div class="auth-vista" *ngIf="!sent">
+      <a routerLink="/" class="auth-volver">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+        Volver
+      </a>
+      <div class="auth-icono-grande">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/><circle cx="12" cy="16" r="1.3" fill="#fff"/></svg>
       </div>
-    </section>
+      <h1 class="auth-titulo">¿Olvidaste tu contraseña?</h1>
+      <p class="auth-texto">No te preocupes. Escribe el correo de tu cuenta y te enviaremos un enlace para crear una nueva.</p>
 
-    <!-- ═══════════════════════════════════════════
-         PANEL DERECHO — Recuperar contraseña
-    ════════════════════════════════════════════ -->
-    <section class="login-panel">
-      <div class="login-panel-inner">
-
-        <!-- Marca -->
-        <div class="login-brand">
-          <img src="/assets/brand/sogo-fondo-claro.png" alt="SOGO" class="brand-logo">
+      <form (ngSubmit)="submit()">
+        <div class="auth-campo" [class.auth-campo--error]="emailError">
+          <input
+            id="rr-email"
+            name="email"
+            type="email"
+            [(ngModel)]="email"
+            (ngModelChange)="emailError = ''"
+            placeholder="tucorreo@ejemplo.com"
+            aria-label="Correo electrónico"
+            autocomplete="email"
+          >
+          <span class="auth-ico">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+          </span>
         </div>
+        <div class="auth-ayuda">{{ emailError }}</div>
 
-        <!-- Ícono correo -->
-        <div class="recover-icon-wrap">
-          <svg class="recover-icon" viewBox="0 0 24 24">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="M2 7l10 7 10-7"/>
-          </svg>
-        </div>
+        <button class="auth-btn" [class.auth-btn--cargando]="loading" type="submit" [disabled]="loading">
+          <span class="auth-btn-contenido">
+            Enviar enlace
+            <span class="auth-flecha">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+            </span>
+          </span>
+          <span class="auth-spinner"></span>
+        </button>
+      </form>
 
-        <!-- Títulos -->
-        <h2 class="recover-title">Recuperar contraseña</h2>
-        <p class="recover-desc">
-          Ingresa tu correo electrónico y te enviaremos<br>
-          un enlace para restablecer tu contraseña.
-        </p>
+      <div class="auth-msg" *ngIf="error" role="alert">{{ error }}</div>
+    </div>
 
-        <!-- Formulario -->
-        <div class="login-form">
+    <!-- Correo enviado -->
+    <div class="auth-vista" *ngIf="sent">
+      <div class="auth-icono-grande">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#e6ad5c" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+      </div>
+      <h1 class="auth-titulo">¡Revisa tu correo!</h1>
+      <!-- El servidor no revela si el correo existe: el mensaje no puede afirmar que el enlace se envió -->
+      <p class="auth-texto" role="status">Si <b>{{ email.trim() }}</b> pertenece a una cuenta de SOGO, te enviamos un enlace que dura 1 hora. Si no lo ves, revisa la carpeta de spam.</p>
+      <a routerLink="/" class="auth-btn">
+        <span class="auth-btn-contenido">Volver a iniciar sesión</span>
+      </a>
+      <p class="auth-reenvio">
+        ¿No te llegó?
+        <button class="auth-reenviar" type="button" (click)="resend()" [disabled]="loading || cooldown > 0">
+          {{ cooldown > 0 ? 'Reenviado ✓ (' + cooldown + 's)' : loading ? 'Enviando…' : 'Reenviar' }}
+        </button>
+      </p>
+      <div class="auth-msg" *ngIf="error" role="alert">{{ error }}</div>
+    </div>
 
-          <!-- Correo -->
-          <div class="form-field">
-            <label for="rr-email">Correo electrónico</label>
-            <div class="input-wrapper">
-              <span class="input-icon input-icon--outline">
-                <svg class="icon-svg" viewBox="0 0 24 24">
-                  <rect x="2" y="4" width="20" height="16" rx="2"/>
-                  <path d="M2 7l10 7 10-7"/>
-                </svg>
-              </span>
-              <input
-                id="rr-email"
-                type="email"
-                [(ngModel)]="email"
-                placeholder="ejemplo@correo.com"
-                autocomplete="email"
-              >
-            </div>
-          </div>
-
-          <!-- Botón enviar -->
-          <button class="primary" type="button" (click)="submit()" [disabled]="loading">
-            <svg viewBox="0 0 24 24">
-              <line x1="22" y1="2" x2="11" y2="13"/>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-            {{ loading ? 'Enviando…' : 'Enviar enlace de recuperación' }}
-          </button>
-
-          <!-- Mensaje confirmación / error -->
-          <div class="msg msg--success" *ngIf="message && !error" role="status">{{ message }}</div>
-          <div class="msg" *ngIf="error" role="alert">{{ error }}</div>
-
-          <!-- Separador -->
-          <div class="or-separator"><span>o</span></div>
-
-          <!-- Volver al inicio de sesión -->
-          <a routerLink="/" class="btn-back">
-            <svg viewBox="0 0 24 24">
-              <line x1="19" y1="12" x2="5" y2="12"/>
-              <polyline points="12 19 5 12 12 5"/>
-            </svg>
-            Volver al inicio de sesión
-          </a>
-
-        </div><!-- /login-form -->
-
-        <!-- Footer -->
-        <div class="login-footer">
-          <p class="login-footer-promo">
-            <svg viewBox="0 0 24 24">
-              <rect x="3" y="11" width="18" height="9" rx="2"/>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            Tu seguridad es nuestra prioridad.
-          </p>
-          <p class="login-footer-copy">
-            © 2024 Hospedaje Sebastián Filandia.<br>
-            Todos los derechos reservados.
-          </p>
-        </div>
-
-      </div><!-- /login-panel-inner -->
-    </section>
-
-  </div>
+  </app-auth-shell>
   `
 })
-export class ResetRequestComponent {
-  email   = '';
-  message = '';
-  error   = '';
-  loading = false;
+export class ResetRequestComponent implements OnDestroy {
+  email      = (history.state?.email as string) || '';
+  emailError = '';
+  error      = '';
+  loading    = false;
+  sent       = false;
+  cooldown   = 0;
+
+  private timer?: ReturnType<typeof setInterval>;
 
   constructor(private auth: AuthService) {}
 
+  ngOnDestroy(): void {
+    clearInterval(this.timer);
+  }
+
   submit(): void {
-    this.message = '';
-    this.error   = '';
-    if (!this.email.trim()) { this.error = 'Escribe el correo de tu cuenta.'; return; }
+    this.error = '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email.trim())) {
+      this.emailError = 'Escribe un correo válido';
+      return;
+    }
+    this.send(() => { this.sent = true; });
+  }
+
+  resend(): void {
+    this.error = '';
+    this.send(() => this.startCooldown());
+  }
+
+  private send(onSent: () => void): void {
     this.loading = true;
-    this.auth.resetRequest(this.email).subscribe({
-      next:  (r: any) => { this.message = r.message || 'Si existe una cuenta, se envió el enlace.'; this.loading = false; },
+    this.auth.resetRequest(this.email.trim()).subscribe({
+      next: () => { this.loading = false; onSent(); },
       error: (e: any) => {
         this.loading = false;
         this.error = e?.status === 0 ? 'No hay conexión con el servidor de SOGO.' : e?.error?.message || 'No se pudo enviar el correo. Intenta de nuevo.';
       }
     });
+  }
+
+  private startCooldown(): void {
+    this.cooldown = ESPERA_REENVIO;
+    this.timer = setInterval(() => {
+      this.cooldown--;
+      if (this.cooldown <= 0) clearInterval(this.timer);
+    }, 1000);
   }
 }

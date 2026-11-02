@@ -124,3 +124,17 @@
 .tp-missing a { margin-left: 8px; font-weight: 600; color: #0B6FD0; }
 
 .rsv-actions .rsv-btn--sm { height: 30px; }
+
+/* Acceso al SIRE con el número de extranjeros por reportar */
+.tp-sire-count {
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #DC2626;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}

@@ -116,6 +116,48 @@ export interface TraRecord {
   checkInAt?:    string;
   sentBy?:       string;
   updatedAt:     string;
+  sire?:         SireData;     // extranjeros: reporte a Migración Colombia
+}
+
+// ── SIRE · Migración Colombia (Res. 2357 de 2020) ──────
+// Cada extranjero se reporta dos veces: ENTRADA (check-in) y SALIDA (check-out),
+// el mismo día del movimiento. El SIRE no tiene API: se diligencia el formulario
+// en su portal y SOGO lleva el control de qué falta y qué ya se reportó.
+export type SireMovementType = 'ENTRADA' | 'SALIDA';
+export type SireStatus = 'PROGRAMADO' | 'INCOMPLETO' | 'PENDIENTE' | 'VENCIDO' | 'REPORTADO';
+
+/** Campos del formulario SIRE que la TRA no tiene (o tiene distinto). Prellenados desde el huésped. */
+export interface SireGuestData {
+  firstLastName:   string;
+  secondLastName:  string;
+  birthDate:       string;     // YYYY-MM-DD
+  nationality:     string;     // Country.id
+  originCountry:   string;     // país de procedencia
+  nextDestination: string;     // país próximo destino
+}
+
+export interface SireReport {
+  guestId:      string;
+  type:         SireMovementType;
+  movementDate: string;        // YYYY-MM-DD, la que se digitó en el SIRE
+  reportedAt:   string;        // YYYY-MM-DDTHH:mm:ss
+  reportedBy:   string;
+}
+
+export interface SireData {
+  guests:  Record<string, SireGuestData>;
+  reports: SireReport[];
+}
+
+/** Movimiento derivado: existe desde que la reserva tiene check-in (o check-out). */
+export interface SireMovement {
+  reservationId: string;
+  guestId:       string;
+  type:          SireMovementType;
+  date:          string;       // YYYY-MM-DD
+  status:        SireStatus;
+  issues:        string[];
+  report?:       SireReport;
 }
 
 // ── Configuración ──────────────────────────────────────

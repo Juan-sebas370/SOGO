@@ -266,6 +266,7 @@ export class DashboardComponent implements OnDestroy {
     ],
     tra: [
       { label: 'Panel TRA',             link: '/dashboard/tra',                    exact: true },
+      { label: 'SIRE · Extranjeros',    link: '/dashboard/tra/sire',               exact: false },
       { label: 'Configuración TRA',     link: '/dashboard/tra/config',             exact: false },
     ],
     billing: [

@@ -1,7 +1,7 @@
 import { TraGuest, TraRecord, TraSettings, LodgingUnit } from './tra.model';
 import {
   validate, guestIssues, isComplete, travelOf, inherits, isMinor, needsSire, progressOf, nightsBetween,
-  overCapacityUnits, totalValue, requiresTra, unitIdsFor, splitName, draftFor, fullName,
+  overCapacityUnits, totalValue, requiresTra, unitIdsFor, splitName, draftFor, fullName, suggestedDocType, canSuggestDoc,
 } from './tra-rules';
 import { Reservation } from '../reservations/reservation.model';
 
@@ -93,6 +93,21 @@ describe('TRA · validación previa al envío', () => {
     const p = principal({ travel: { ...principal().travel, residenceCountry: 'PE' } });
     expect(validate(record([p, companion()]), reservation(), settings(), UNITS).issues.some(i => i.message.includes('catálogo inválidos'))).toBeTrue();
   });
+
+  it('acepta una ciudad del exterior escrita a mano (sin código DANE)', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCountry: 'CL', residenceCity: 'Valparaíso', originCountry: 'CL', originCity: 'Santiago' } });
+    expect(validate(record([p, companion()]), reservation(), settings(), UNITS).issues.some(i => i.message.includes('catálogo inválidos'))).toBeFalse();
+  });
+
+  it('en Colombia la ciudad debe ser del catálogo DANE', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCity: 'Pueblo inventado' } });
+    expect(validate(record([p, companion()]), reservation(), settings(), UNITS).issues.some(i => i.message.includes('catálogo inválidos'))).toBeTrue();
+  });
+
+  it('una ciudad escrita solo con espacios cuenta como faltante', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCountry: 'CL', residenceCity: '   ' } });
+    expect(guestIssues(record([p]), p)).toContain('Falta país o ciudad de residencia del huésped principal');
+  });
 });
 
 describe('TRA · huéspedes', () => {
@@ -166,5 +181,52 @@ describe('TRA · utilidades', () => {
     expect(d.guests[0].firstNames).toBe('María José');
     expect(d.guests[0].travel.residenceCountry).toBe('CO');
     expect(d.guests[0].travel.residenceCity).toBe('66001');   // Pereira, del catálogo TRA
+  });
+});
+
+describe('TRA · predicción del tipo de documento', () => {
+  it('reside en el exterior → pasaporte', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCountry: 'CL' } });
+    expect(suggestedDocType(record([p]), p)).toEqual({ code: 'PA', reason: 'reside en Chile' });
+  });
+
+  it('reside en Colombia → cédula, o tarjeta de identidad si es menor', () => {
+    expect(suggestedDocType(record(), principal())?.code).toBe('CC');
+    const nino = companion({ birthDate: '2015-01-01' });
+    expect(suggestedDocType(record([principal(), nino]), nino)?.code).toBe('TI');
+  });
+
+  it('el acompañante que hereda el viaje hereda la sugerencia del principal', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCountry: 'US' } });
+    const c = companion();
+    expect(suggestedDocType(record([p, c]), c)?.code).toBe('PA');
+  });
+
+  it('sin residencia no sugiere nada', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCountry: '' } });
+    expect(suggestedDocType(record([p]), p)).toBeUndefined();
+  });
+
+  it('solo cambia un tipo vacío, puesto por SOGO o la cédula por defecto', () => {
+    expect(canSuggestDoc('', 'PA', false)).toBeTrue();
+    expect(canSuggestDoc('CC', 'PA', false)).toBeTrue();
+    expect(canSuggestDoc('PA', 'CC', true)).toBeTrue();
+    expect(canSuggestDoc('PA', 'CC', false)).toBeFalse();
+    expect(canSuggestDoc('PPT', 'CC', false)).toBeFalse();
+    expect(canSuggestDoc('CE', 'PA', false)).toBeFalse();
+  });
+});
+
+describe('TRA · municipios de Colombia (DIVIPOLA)', () => {
+  it('reconoce cualquier municipio con su código DANE, no solo las capitales', () => {
+    const p = principal({ travel: { ...principal().travel, residenceCity: '66682', originCity: '76834' } }); // Santa Rosa de Cabal, Tuluá
+    expect(validate(record([p, companion()]), reservation(), settings(), UNITS).issues.some(i => i.message.includes('catálogo inválidos'))).toBeFalse();
+  });
+
+  it('toma de la reserva el municipio correcto aunque el nombre se repita en otro departamento', () => {
+    const rec = draftFor(reservation({ city: 'Colombia - Armenia, Antioquia' }), UNITS, '2026-10-01T10:00');
+    expect(rec.guests[0].travel.residenceCity).toBe('05059');
+    const q = draftFor(reservation({ city: 'Colombia - Armenia, Quindío' }), UNITS, '2026-10-01T10:00');
+    expect(q.guests[0].travel.residenceCity).toBe('63001');
   });
 });

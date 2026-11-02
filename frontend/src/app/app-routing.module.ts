@@ -22,6 +22,7 @@ import { TraRegistrationComponent } from './tra/tra-registration/tra-registratio
 import { TraSummaryComponent } from './tra/tra-summary/tra-summary.component';
 import { TraDetailComponent } from './tra/tra-detail/tra-detail.component';
 import { TraConfigComponent } from './tra/tra-config/tra-config.component';
+import { TraSireComponent } from './tra/tra-sire/tra-sire.component';
 import { LodgingListComponent } from './lodging/lodging-list/lodging-list.component';
 import { CheckinFormComponent } from './lodging/checkin-form/checkin-form.component';
 import { CheckoutFormComponent } from './lodging/checkout-form/checkout-form.component';
@@ -131,6 +132,7 @@ export const routes: Routes = [
       // TRA (:id = id de la reserva: la TRA cuelga de ella)
       { path: 'tra',                component: TraPanelComponent },
       { path: 'tra/config',         component: TraConfigComponent },
+      { path: 'tra/sire',           component: TraSireComponent },
       { path: 'tra/:id',            component: TraDetailComponent },
       { path: 'tra/:id/registro',   component: TraRegistrationComponent },
       { path: 'tra/:id/resumen',    component: TraSummaryComponent },

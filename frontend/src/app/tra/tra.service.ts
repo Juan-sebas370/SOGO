@@ -8,9 +8,13 @@ import { ROOMS, summaryOf } from '../lodging/house';
 import { ReservationService } from '../reservations/reservation.service';
 import { Reservation, isVoid } from '../reservations/reservation.model';
 import { isoDate, isoDateTime } from '../shared/date-utils';
-import { TraRecord, TraViewStatus, TraGuest, TraUnit, TraSend, TraEvent, TraSettings, LodgingUnit } from './tra.model';
+import {
+  TraRecord, TraViewStatus, TraGuest, TraUnit, TraSend, TraEvent, TraSettings, LodgingUnit,
+  SireData, SireGuestData, SireMovement, SireMovementType, SireReport
+} from './tra.model';
 import { DEFAULT_UNITS } from './tra-catalogs';
 import { Validation, validate, draftFor, requiresTra, fullName, principalOf } from './tra-rules';
+import { sireMovements } from './sire-rules';
 import { TraGatewayService, GatewayResult } from './tra-gateway.service';
 
 /** Una fila del panel: la reserva con su TRA (las pasadías no tienen). */
@@ -267,6 +271,56 @@ export class TraService {
     });
     this.put({ ...rec, sends, status: 'REPORTADA', checkInAt: rec.checkInAt ?? at, sentBy: this.actor() },
       this.event('TRA reportada en la plataforma del MinCIT', `N.º ${mincitId.trim()} · ${this.actor()}`, 'ok'));
+  }
+
+  // ── SIRE · Migración Colombia ────────────────────────
+  // Vive dentro de la misma TRA (campo `sire` del JSON): no tiene tabla propia y
+  // se puede completar aunque la TRA ya esté reportada al MinCIT.
+
+  /** Movimientos SIRE de todas las reservas con extranjeros. */
+  sireMovements(): { row: TraRow; movements: SireMovement[] }[] {
+    return this.rows$.value
+      .filter(row => row.record)
+      .map(row => ({ row, movements: sireMovements(row.record!, row.reservation) }))
+      .filter(x => x.movements.length);
+  }
+
+  saveSireData(reservationId: string, guestId: string, data: SireGuestData): void {
+    const rec = this.records.get(reservationId);
+    const g = rec?.guests.find(x => x.id === guestId);
+    if (!rec || !g) return;
+    const sire = this.sireOf(rec);
+    this.put({ ...rec, sire: { ...sire, guests: { ...sire.guests, [guestId]: clone(data) } } },
+      this.event('SIRE · datos del extranjero actualizados', `${fullName(g)} · ${this.actor()}`, 'muted'));
+  }
+
+  /** Movimientos que ya se guardaron en el portal del SIRE. */
+  markSireReported(reservationId: string, items: { guestId: string; type: SireMovementType; date: string }[]): void {
+    const rec = this.records.get(reservationId);
+    if (!rec || !items.length) return;
+    const sire = this.sireOf(rec);
+    const at = now();
+    const fresh = items.filter(i => !sire.reports.some(x => x.guestId === i.guestId && x.type === i.type));
+    if (!fresh.length) return;
+    const reports: SireReport[] = [...sire.reports,
+      ...fresh.map(i => ({ guestId: i.guestId, type: i.type, movementDate: i.date, reportedAt: at, reportedBy: this.actor() }))];
+    const names = fresh.map(i => `${fullName(rec.guests.find(g => g.id === i.guestId)!)} (${i.type === 'ENTRADA' ? 'entrada' : 'salida'})`);
+    this.put({ ...rec, sire: { ...sire, reports } },
+      this.event('Reportado al SIRE', `${names.join(', ')} · ${this.actor()}`, 'ok'));
+  }
+
+  /** Deshace un «reportado» marcado por error (el registro en el SIRE no cambia). */
+  undoSireReport(reservationId: string, guestId: string, type: SireMovementType): void {
+    const rec = this.records.get(reservationId);
+    const g = rec?.guests.find(x => x.id === guestId);
+    if (!rec || !g) return;
+    const sire = this.sireOf(rec);
+    this.put({ ...rec, sire: { ...sire, reports: sire.reports.filter(x => !(x.guestId === guestId && x.type === type)) } },
+      this.event('SIRE · reporte desmarcado', `${fullName(g)} (${type === 'ENTRADA' ? 'entrada' : 'salida'}) · ${this.actor()}`, 'danger'));
+  }
+
+  private sireOf(rec: TraRecord): SireData {
+    return { guests: rec.sire?.guests ?? {}, reports: rec.sire?.reports ?? [] };
   }
 
   private runAutoRetries(): void {

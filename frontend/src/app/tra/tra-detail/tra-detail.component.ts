@@ -7,7 +7,8 @@ import { fmtDate, fmtDateTime, fmtMoney, typeBadge } from '../../reservations/re
 import { isoDateTime } from '../../shared/date-utils';
 import { esc, openDocument } from '../../shared/documents';
 import { TraService } from '../tra.service';
-import { TraRecord, TraGuest, TraSend, TraViewStatus, LodgingUnit } from '../tra.model';
+import { TraRecord, TraGuest, TraSend, TraViewStatus, LodgingUnit, SireMovement } from '../tra.model';
+import { sireMovements, sireStatusLabel, sireStatusBadge, dmy } from '../sire-rules';
 import {
   roleLabel, fullName, fmtDoc, fmtStamp, needsSire, nightsBetween, totalValue, statusLabel, statusBadge, sendBadge
 } from '../tra-rules';
@@ -145,11 +146,17 @@ import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
           <h2 class="tra-card-title">SIRE · Migración Colombia</h2>
           <span class="rsv-badge" [ngClass]="foreigners.length ? 'rsv-badge--warn' : 'rsv-badge--muted'">{{ foreigners.length ? 'Aplica' : 'No aplica' }}</span>
         </div>
-        <p class="td-sire" *ngIf="foreigners.length">
-          {{ foreigners.length }} huésped{{ foreigners.length === 1 ? '' : 'es' }} con documento extranjero ({{ foreignerNames }}) se reporta{{ foreigners.length === 1 ? '' : 'n' }} a Migración Colombia en el módulo SIRE.
-        </p>
+        <ng-container *ngIf="foreigners.length">
+          <p class="td-sire">Entrada y salida de cada extranjero, el mismo día en que ocurren:</p>
+          <ul class="td-sire-list">
+            <li *ngFor="let m of sire">
+              <span>{{ m.type === 'ENTRADA' ? 'Entrada' : 'Salida' }} · {{ sireName(m.guestId) }} · {{ dmy(m.date) }}</span>
+              <span class="rsv-badge" [ngClass]="sireBadge(m.status)">{{ sireLabel(m.status) }}</span>
+            </li>
+          </ul>
+          <a class="rsv-btn rsv-btn--outline rsv-btn--sm" routerLink="/dashboard/tra/sire" [queryParams]="{ reserva: r.id }">Abrir en SIRE</a>
+        </ng-container>
         <p class="td-sire" *ngIf="!foreigners.length">En esta reserva todos los huéspedes tienen documento colombiano.</p>
-        <p class="td-sire tra-muted">Módulo independiente de la TRA: lee los mismos datos del huésped, pero tiene su propio estado, envío y auditoría. Aún no está disponible en SOGO.</p>
       </section>
     </aside>
   </div>
@@ -215,7 +222,11 @@ export class TraDetailComponent {
   get unitNames(): string { return this.rec!.units.map(u => this.units.find(x => x.id === u.unitId)?.name ?? '—').join(' + '); }
   get selectedSend(): TraSend | undefined { return this.rec!.sends[this.selected]?.attemptAt ? this.rec!.sends[this.selected] : undefined; }
   get foreigners(): TraGuest[] { return this.rec!.guests.filter(needsSire); }
-  get foreignerNames(): string { return this.foreigners.map(fullName).join(', '); }
+  get sire(): SireMovement[] { return sireMovements(this.rec!, this.r!); }
+  readonly dmy = dmy;
+  readonly sireLabel = sireStatusLabel;
+  readonly sireBadge = sireStatusBadge;
+  sireName(guestId: string): string { const g = this.rec!.guests.find(x => x.id === guestId); return g ? fullName(g) : '—'; }
 
   guest(s: TraSend): TraGuest | undefined { return this.rec!.guests.find(g => g.id === s.guestId); }
   name(s: TraSend): string { const g = this.guest(s); return g ? fullName(g) : '—'; }

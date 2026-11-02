@@ -8,12 +8,15 @@ import { isoDateTime } from '../../shared/date-utils';
 import { TraService } from '../tra.service';
 import { TraRecord, TraGuest, TraUnit, TravelData, LodgingUnit } from '../tra.model';
 import {
-  DOCUMENT_TYPES, TRAVEL_REASONS, COUNTRIES, ACCOMMODATION_TYPES, RELATIONSHIPS, citiesOf
+  DOCUMENT_TYPES, TRAVEL_REASONS, ACCOMMODATION_TYPES, RELATIONSHIPS, usesCityCatalog, COUNTRY_OPTIONS, FREQUENT_COUNTRIES, cityOptions,
+  docTypeLabel
 } from '../tra-catalogs';
 import {
-  principalOf, companionsOf, fullName, guestIssues, isComplete, isMinor, needsSire, progressOf, nightsBetween, newCompanion
+  principalOf, companionsOf, fullName, guestIssues, isComplete, isMinor, needsSire, progressOf, nightsBetween, newCompanion,
+  suggestedDocType, canSuggestDoc
 } from '../tra-rules';
 import { TraStepperComponent } from '../tra-stepper/tra-stepper.component';
+import { SearchSelectComponent } from '../../shared/search-select/search-select.component';
 import { roomByNumber, roomDescription, summaryOf } from '../../lodging/house';
 
 interface MinorForm { guest: TraGuest; readonly: boolean; travelsWith: string; support: string; confirmed: boolean; }
@@ -23,7 +26,7 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
 @Component({
   selector: 'app-tra-registration',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TraStepperComponent],
+  imports: [CommonModule, FormsModule, RouterLink, TraStepperComponent, SearchSelectComponent],
   styleUrls: ['./tra-registration.component.css'],
   template: `
   <ng-container *ngIf="rec && r; else notFound">
@@ -157,7 +160,7 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
           <div class="tra-grid">
             <div class="rsv-field"><label for="p-phone">Teléfono</label><input id="p-phone" class="rsv-input" [(ngModel)]="p.phone"></div>
             <div class="rsv-field"><label for="p-mail">Correo</label><input id="p-mail" type="email" class="rsv-input" [(ngModel)]="p.email"></div>
-            <div class="rsv-field"><label for="p-birth">Fecha de nacimiento</label><input id="p-birth" type="date" class="rsv-input" [(ngModel)]="p.birthDate"></div>
+            <div class="rsv-field"><label for="p-birth">Fecha de nacimiento</label><input id="p-birth" type="date" class="rsv-input" [(ngModel)]="p.birthDate" (ngModelChange)="predictDocs()"></div>
           </div>
         </div>
       </section>
@@ -199,7 +202,7 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
             </div>
             <div class="rsv-field">
               <label [for]="g.id + '-birth'">Fecha de nacimiento <span class="tra-tag">PMS</span></label>
-              <input [id]="g.id + '-birth'" type="date" class="rsv-input" [(ngModel)]="g.birthDate">
+              <input [id]="g.id + '-birth'" type="date" class="rsv-input" [(ngModel)]="g.birthDate" (ngModelChange)="predictDocs()">
             </div>
             <div class="rsv-field" *ngIf="rec.units.length > 1">
               <label [for]="g.id + '-unit'">Unidad del huésped</label>
@@ -302,10 +305,11 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
     <div class="tra-grid tra-grid--4">
       <div class="rsv-field">
         <label [for]="g.id + '-dt'">Tipo de documento *</label>
-        <select [id]="g.id + '-dt'" class="rsv-input" [(ngModel)]="g.docType" [class.invalid]="showErrors && !g.docType">
+        <select [id]="g.id + '-dt'" class="rsv-input" [ngModel]="g.docType" (ngModelChange)="setDocType(g, $event)" [class.invalid]="showErrors && !g.docType">
           <option value="">Seleccionar...</option>
           <option *ngFor="let d of documentTypes" [value]="d.code">{{ d.code }} · {{ d.label }}</option>
         </select>
+        <small class="tr-predicted" *ngIf="docHints[g.id] as h">{{ h }}</small>
       </div>
       <div class="rsv-field">
         <label [for]="g.id + '-dn'">Número de documento *</label>
@@ -330,32 +334,26 @@ const SUPPORTS = ['Registro civil', 'Autorización de los padres', 'Documento qu
       <h3 class="tra-section-label tra-span-2 tr-hide-sm">Procedencia <small>· desde donde inició el viaje</small></h3>
       <div class="rsv-field">
         <label [for]="g.id + '-rc'">País *</label>
-        <select [id]="g.id + '-rc'" class="rsv-input" [ngModel]="t.residenceCountry" (ngModelChange)="setCountry(t, 'residence', $event)" [class.invalid]="showErrors && !t.residenceCountry">
-          <option value="">Seleccionar...</option>
-          <option *ngFor="let c of countries" [value]="c.id">{{ c.name }}</option>
-        </select>
+        <app-search-select [inputId]="g.id + '-rc'" [options]="countryOptions" [pinned]="frequentCountries" placeholder="Escribe el país…"
+                           [ngModel]="t.residenceCountry" (ngModelChange)="setCountry(t, 'residence', $event)" [invalid]="showErrors && !t.residenceCountry"></app-search-select>
       </div>
       <div class="rsv-field">
         <label [for]="g.id + '-rci'">Ciudad *</label>
-        <select [id]="g.id + '-rci'" class="rsv-input" [(ngModel)]="t.residenceCity" [class.invalid]="showErrors && !t.residenceCity">
-          <option value="">Seleccionar...</option>
-          <option *ngFor="let c of cities(t.residenceCountry)" [value]="c.id">{{ c.name }} ({{ c.department }})</option>
-        </select>
+        <app-search-select [inputId]="g.id + '-rci'" [options]="cityOptions(t.residenceCountry)" [allowFree]="!catalogCity(t.residenceCountry)"
+                           [placeholder]="cityPlaceholder(t.residenceCountry)" [disabled]="!t.residenceCountry"
+                           [ngModel]="t.residenceCity" (ngModelChange)="setResidenceCity(t, $event)" [invalid]="showErrors && !t.residenceCity?.trim()"></app-search-select>
       </div>
       <h3 class="tra-section-label tra-span-2 tr-show-sm">Procedencia <small>· desde donde inició el viaje</small></h3>
       <div class="rsv-field">
         <label [for]="g.id + '-oc'">País *</label>
-        <select [id]="g.id + '-oc'" class="rsv-input" [ngModel]="t.originCountry" (ngModelChange)="setCountry(t, 'origin', $event)" [class.invalid]="showErrors && !t.originCountry">
-          <option value="">Seleccionar...</option>
-          <option *ngFor="let c of countries" [value]="c.id">{{ c.name }}</option>
-        </select>
+        <app-search-select [inputId]="g.id + '-oc'" [options]="countryOptions" [pinned]="frequentCountries" placeholder="Escribe el país…"
+                           [ngModel]="t.originCountry" (ngModelChange)="setCountry(t, 'origin', $event)" [invalid]="showErrors && !t.originCountry"></app-search-select>
       </div>
       <div class="rsv-field">
         <label [for]="g.id + '-oci'">Ciudad *</label>
-        <select [id]="g.id + '-oci'" class="rsv-input" [(ngModel)]="t.originCity" [class.invalid]="showErrors && !t.originCity">
-          <option value="">Seleccionar...</option>
-          <option *ngFor="let c of cities(t.originCountry)" [value]="c.id">{{ c.name }} ({{ c.department }})</option>
-        </select>
+        <app-search-select [inputId]="g.id + '-oci'" [options]="cityOptions(t.originCountry)" [allowFree]="!catalogCity(t.originCountry)"
+                           [placeholder]="cityPlaceholder(t.originCountry)" [disabled]="!t.originCountry"
+                           [(ngModel)]="t.originCity" [invalid]="showErrors && !t.originCity?.trim()"></app-search-select>
       </div>
       <div class="rsv-field tra-span-2">
         <label [for]="g.id + '-mv'">Principal motivo de viaje *</label>
@@ -426,11 +424,14 @@ export class TraRegistrationComponent implements OnDestroy {
 
   readonly documentTypes = DOCUMENT_TYPES;
   readonly reasons = TRAVEL_REASONS;
-  readonly countries = COUNTRIES;
+  readonly countryOptions = COUNTRY_OPTIONS;
+  readonly frequentCountries = FREQUENT_COUNTRIES;
+  /** Colombia: buscador del catálogo DANE. Exterior: la ciudad se escribe, con sugerencias del catálogo. */
+  readonly catalogCity = usesCityCatalog;
+  readonly cityOptions = cityOptions;
   readonly accommodationTypes = ACCOMMODATION_TYPES;
   readonly relationships = RELATIONSHIPS;
   readonly supports = SUPPORTS;
-  readonly cities = citiesOf;
   readonly date = fmtDate;
   readonly money = fmtMoney;
   readonly typeBadge = typeBadge;
@@ -458,6 +459,9 @@ export class TraRegistrationComponent implements OnDestroy {
       this.editable = this.svc.isEditable(this.rec);
       this.showErrors = this.rec.status === 'REQUIERE_CORRECCION';
       this.lastSaved = this.snapshot();
+      // Borradores creados antes de que la procedencia se copiara de la residencia
+      const t = this.rec.guests[0]?.travel;
+      if (this.editable && t && t.residenceCountry && !t.originCountry) { t.originCountry = t.residenceCountry; t.originCity = t.originCity || t.residenceCity; }
       if (this.editable) {
         this.autosave = setInterval(() => this.flush(), 4000);
         window.addEventListener('beforeunload', this.onUnload);
@@ -533,9 +537,47 @@ export class TraRegistrationComponent implements OnDestroy {
     u.accommodationType = this.units.find(x => x.id === unitId)?.type ?? u.accommodationType;
   }
 
+  cityPlaceholder(countryId: string): string {
+    if (!countryId) return 'Elige primero el país';
+    return usesCityCatalog(countryId) ? 'Escribe la ciudad…' : 'Escribe la ciudad (cualquiera)…';
+  }
+
   setCountry(t: TravelData, which: 'residence' | 'origin', countryId: string): void {
-    if (which === 'residence') { t.residenceCountry = countryId; t.residenceCity = ''; }
-    else { t.originCountry = countryId; t.originCity = ''; }
+    if (which === 'residence') {
+      // La procedencia casi siempre es la residencia: se copia mientras no se haya elegido otra
+      if (!t.originCountry || t.originCountry === t.residenceCountry) { t.originCountry = countryId; t.originCity = ''; }
+      t.residenceCountry = countryId; t.residenceCity = '';
+      this.predictDocs();
+    } else { t.originCountry = countryId; t.originCity = ''; }
+  }
+
+  setResidenceCity(t: TravelData, cityId: string): void {
+    if (t.originCountry === t.residenceCountry && (!t.originCity || t.originCity === t.residenceCity)) t.originCity = cityId;
+    t.residenceCity = cityId;
+  }
+
+  // ── Predicción del tipo de documento ──
+  // SOGO propone el tipo según la residencia y la edad (tra-rules › suggestedDocType) y lo avisa
+  // debajo del campo. Lo que el usuario elige a mano no se vuelve a cambiar.
+  docHints: Record<string, string> = {};
+  private docBySogo = new Set<string>();
+  private docByHand = new Set<string>();
+
+  setDocType(g: TraGuest, code: string): void {
+    g.docType = code;
+    this.docByHand.add(g.id);
+    this.docBySogo.delete(g.id);
+    delete this.docHints[g.id];
+  }
+
+  predictDocs(): void {
+    this.rec?.guests.forEach(g => {
+      const s = suggestedDocType(this.rec!, g);
+      if (!s || this.docByHand.has(g.id) || !canSuggestDoc(g.docType, s.code, this.docBySogo.has(g.id))) return;
+      g.docType = s.code;
+      this.docBySogo.add(g.id);
+      this.docHints[g.id] = `Sugerido: ${docTypeLabel(s.code).toLowerCase()} porque ${s.reason}. Cámbialo si no corresponde.`;
+    });
   }
 
   /** Al desmarcar "Usar información del principal" aparecen sus campos, precargados con los del principal. */
@@ -544,8 +586,10 @@ export class TraRegistrationComponent implements OnDestroy {
     g.ownTravel = own;
   }
 
+  /** El acompañante llega con el tipo de documento que le corresponde según la residencia del grupo. */
   addCompanion(): void {
     this.rec!.guests.push(newCompanion(this.rec!, `${this.rec!.reservationId}-g${Date.now()}`));
+    this.predictDocs();
   }
 
   removeCompanion(g: TraGuest): void {

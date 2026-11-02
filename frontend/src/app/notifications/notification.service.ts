@@ -9,6 +9,7 @@ import { RoomWithStatus } from '../lodging/room.model';
 import { InvoiceService } from '../billing/invoice.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { TraService, TraRow } from '../tra/tra.service';
+import { isDue } from '../tra/sire-rules';
 import { RestaurantService } from '../restaurant/restaurant.service';
 import { ScheduleService } from '../reports/schedule.service';
 import { failed } from '../reports/schedule.model';
@@ -68,6 +69,8 @@ export class NotificationService {
     const pendingReservations = this.reservations.filter(r => r.status === 'Pendiente').length;
     const traErrors = this.traRows.filter(t => t.status === 'ERROR').length;
     const traToFix = this.traRows.filter(t => t.status === 'REQUIERE_CORRECCION').length;
+    const sireDue = this.traService.sireMovements().flatMap(x => x.movements).filter(isDue);
+    const sireLate = sireDue.filter(m => m.status === 'VENCIDO').length;
     const cleaningRooms = this.rooms.filter(r => r.status === 'En limpieza');
     const maintenanceRooms = this.rooms.filter(r => r.status === 'En mantenimiento' || r.status === 'Fuera de servicio');
 
@@ -89,6 +92,10 @@ export class NotificationService {
     }
     if (on('tra') && traToFix > 0) {
       list.push({ icon: 'review', level: 'Media', label: 'TRA por corregir', detail: `${traToFix} TRA con datos faltantes`, link: '/dashboard/tra' });
+    }
+    if (on('tra') && sireDue.length > 0) {
+      list.push({ icon: 'review', level: sireLate ? 'Alta' : 'Media', label: 'Extranjeros por reportar al SIRE',
+        detail: `${sireDue.length} movimiento(s) de entrada o salida${sireLate ? ` · ${sireLate} vencido(s)` : ''}`, link: '/dashboard/tra/sire' });
     }
     if (on('reservations') && pendingReservations > 0) {
       list.push({ icon: 'review', level: 'Baja', label: 'Reservas por confirmar', detail: `${pendingReservations} reserva(s) pendientes`, link: '/dashboard/reservations' });

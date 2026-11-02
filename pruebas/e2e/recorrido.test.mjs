@@ -49,9 +49,9 @@ describe('Inicio de sesión', () => {
   });
 
   test('con usuario y clave correctos entra al panel', async () => {
-    await page.type('input[placeholder="usuario@hospedaje.com"]', process.env.QA_ADMIN ?? 'sebastian@gmail.com');
-    await page.type('input[placeholder="••••••••"]', process.env.QA_PASS ?? 'Prueba#2026');
-    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button.primary')]);
+    await page.type('#lf-user', process.env.QA_ADMIN ?? 'sebastian@gmail.com');
+    await page.type('#lf-pass', process.env.QA_PASS ?? 'Prueba#2026');
+    await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type="submit"]')]);
     assert.match(page.url(), /\/dashboard/);
   });
 });
@@ -69,16 +69,25 @@ describe('Panel de inicio', () => {
 });
 
 describe('Reservas', () => {
-  test('el lugar de residencia va separado y el municipio depende del departamento', async () => {
+  test('el municipio se busca directo y llena su departamento; con departamento, solo sus municipios', async () => {
     await go('/dashboard/reservations/new');
     await page.waitForSelector('#country');
     assert.equal(await page.$eval('#country', e => e.value), 'Colombia');
     assert.equal(await page.$('#plan'), null, 'Sigue apareciendo Plan / tarifa');
-    assert.ok(await page.$eval('#town', e => e.disabled), 'El municipio debe esperar al departamento');
-    await page.select('#department', 'Quindío');
-    const towns = await page.$$eval('#town option', os => os.map(o => o.textContent.trim()));
-    assert.ok(towns.includes('Filandia'));
-    assert.equal(towns.length - 1, 12);
+    // Buscar el municipio sin elegir departamento: «filan» → Filandia (Quindío)
+    await page.click('#town');
+    await page.type('#town', 'filan');
+    const hits = await page.$$eval('.ss-list li', ls => ls.map(l => l.innerText.replace(/\s+/g, ' ').trim()));
+    assert.ok(hits.some(t => t.includes('Filandia') && t.includes('Quindío')), hits.join(' | '));
+    await page.keyboard.press('Enter');
+    await new Promise(r => setTimeout(r, 300));
+    assert.equal(await page.$eval('#town', e => e.value), 'Filandia');
+    assert.equal(await page.$eval('#department', e => e.value), 'Quindío');
+    // Con el departamento elegido, la lista se limita a sus 12 municipios
+    await page.click('#town');
+    await new Promise(r => setTimeout(r, 300));
+    assert.equal((await page.$$('.ss-list li')).length, 12);
+    await page.keyboard.press('Escape');
     await shot('03-nueva-reserva');
   });
 });

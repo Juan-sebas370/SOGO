@@ -5,7 +5,7 @@ import { Reservation } from '../../reservations/reservation.model';
 import { fmtDate, fmtMoney } from '../../reservations/reservation-format';
 import { TraService } from '../tra.service';
 import { TraRecord, TraGuest, LodgingUnit } from '../tra.model';
-import { country, city, reasonLabel, accommodationLabel } from '../tra-catalogs';
+import { country, cityLabel, reasonLabel, accommodationLabel } from '../tra-catalogs';
 import {
   Validation, travelOf, inherits, isComplete, roleLabel, fullName, fmtDoc, nightsBetween, totalValue
 } from '../tra-rules';
@@ -191,7 +191,7 @@ export class TraSummaryComponent {
   place(g: TraGuest, which: 'residence' | 'origin'): string {
     const t = this.travel(g);
     const [c, ci] = which === 'residence' ? [t.residenceCountry, t.residenceCity] : [t.originCountry, t.originCity];
-    return c ? `${country(c)?.name ?? c} · ${city(ci)?.name ?? '—'}` : '—';
+    return c ? `${country(c)?.name ?? c} · ${cityLabel(ci) || '—'}` : '—';
   }
 
   /** Con el nombre del huésped cuando se conoce: "Acompañante 3 · Martín Gómez — Falta número de documento" */

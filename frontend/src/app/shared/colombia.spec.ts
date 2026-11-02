@@ -1,4 +1,4 @@
-import { CO_DEPARTMENTS, townsOf, parsePlace, formatPlace, isColombia, matchColombia } from './colombia';
+import { CO_DEPARTMENTS, townsOf, parsePlace, formatPlace, isColombia, matchColombia, townSearch, townKey, splitTownKey, COUNTRY_SEARCH } from './colombia';
 
 describe('Catálogo DANE de Colombia', () => {
   it('tiene los 33 departamentos (incluye Bogotá D.C. y San Andrés) y 1.122 municipios', () => {
@@ -63,5 +63,25 @@ describe('Lugar de residencia por partes', () => {
 
   it('matchColombia devuelve vacío si no está en el catálogo', () => {
     expect(matchColombia('Atlantis', 'Ciudad')).toEqual({ department: '', town: '' });
+  });
+
+  it('el buscador de municipios abarca todo el país y trae el departamento', () => {
+    expect(townSearch('').length).toBe(1122);
+    const filandia = townSearch('').find(o => o.label === 'Filandia')!;
+    expect(filandia.hint).toBe('Quindío');
+    expect(splitTownKey(filandia.value)).toEqual({ department: 'Quindío', town: 'Filandia' });
+  });
+
+  it('distingue municipios con el mismo nombre en distintos departamentos', () => {
+    const armenias = townSearch('').filter(o => o.label === 'Armenia').map(o => o.hint);
+    expect(armenias).toEqual(jasmine.arrayContaining(['Antioquia', 'Quindío']));
+    expect(townSearch('Quindío').every(o => o.hint === 'Quindío')).toBeTrue();
+    expect(townKey('Quindío', '')).toBe('');
+  });
+
+  it('ofrece todos los países del mundo, Colombia primero', () => {
+    expect(COUNTRY_SEARCH.length).toBeGreaterThan(190);
+    expect(COUNTRY_SEARCH[0].value).toBe('Colombia');
+    expect(COUNTRY_SEARCH.find(o => o.value === 'Chile')?.keywords).toBe('152');
   });
 });

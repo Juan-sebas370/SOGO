@@ -1,0 +1,227 @@
+/* Indicadores, tabs, filtros y tabla: los mismos del listado de Reservas */
+@import url('../../reservations/reservations-list/reservations-list.component.css');
+@import url('../tra.css');
+
+/* =====================================================
+   TRA — SIRE (Migración Colombia)
+   ===================================================== */
+
+.rsv-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.rsv-kpi-icon--red { background: linear-gradient(135deg, #F87171, #DC2626); }
+
+.rsv-eyebrow a { color: inherit; text-decoration: none; }
+.rsv-eyebrow a:hover { text-decoration: underline; }
+.rsv-eyebrow span[aria-hidden] { margin: 0 6px; }
+
+.tra-alert { margin-bottom: 14px; }
+
+/* ── Grupos por fecha de movimiento ──────────────── */
+.ts-group { padding: 0 12px 18px; }
+
+.ts-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 4px;
+  font-size: 13px;
+}
+
+.ts-col-check { width: 34px; text-align: center; }
+.rsv-table td .tra-sub { white-space: normal; }
+
+.ts-move {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #E0F2FE;
+  color: #075985;
+}
+.ts-move--out { background: #F3E8FF; color: #6B21A8; }
+
+/* ── Ficha SIRE ──────────────────────────────────── */
+/* Encabezado y pie fijos; solo el cuerpo se desplaza, y nunca de lado */
+.rsv-modal.ts-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 880px;
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.ts-modal *, .ts-modal *::before, .ts-modal *::after { box-sizing: border-box; }
+
+.ts-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid #EEF1F5;
+}
+.ts-head-main { min-width: 0; }
+.ts-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6B7280; }
+.ts-title { margin: 2px 0 8px; font-size: 18px; font-weight: 700; color: #0A2540; overflow-wrap: anywhere; }
+.ts-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: #374151; }
+
+.ts-close {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.ts-close:hover { background: #F3F4F6; }
+.ts-close svg { width: 18px; height: 18px; stroke: #6B7280; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+.ts-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  padding: 18px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.ts-col { min-width: 0; }
+
+.ts-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 2px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0A2540;
+}
+.ts-step span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0B6FD0;
+  color: #fff;
+  font-size: 11px;
+}
+.ts-hint { margin: 0 0 12px; font-size: 11.5px; line-height: 1.5; color: #6B7280; }
+
+.ts-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.ts-fields .rsv-field { min-width: 0; margin-bottom: 12px; }
+.ts-fields .rsv-input { width: 100%; min-width: 0; }
+.ts-opt { font-weight: 400; color: #9CA3AF; }
+
+.ts-issues {
+  margin: 0 0 12px;
+  padding: 10px 12px 10px 28px;
+  border-radius: 8px;
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ts-done {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ECFDF5;
+  color: #065F46;
+  font-size: 12px;
+}
+
+/* Campos para copiar: etiqueta arriba, valor abajo, botón a la derecha */
+.ts-copy {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  background: #FAFBFC;
+}
+.ts-copy li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 12px;
+  border-bottom: 1px solid #EEF1F5;
+}
+.ts-copy li:last-child { border-bottom: 0; }
+.ts-copy-text { display: flex; flex-direction: column; min-width: 0; }
+.ts-copy-label { font-size: 10.5px; color: #6B7280; }
+.ts-copy-value {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0A2540;
+  overflow-wrap: anywhere;
+}
+.ts-copy--empty .ts-copy-value { font-family: inherit; font-weight: 400; font-style: italic; color: #9CA3AF; }
+
+.ts-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #D1D5DB;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+}
+.ts-copy-btn:hover { background: #F3F4F6; }
+.ts-copy-btn svg { width: 15px; height: 15px; stroke: #374151; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ts-copy-btn.done { border-color: #10B981; background: #ECFDF5; }
+.ts-copy-btn.done svg { stroke: #059669; }
+
+.ts-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #EEF1F5;
+  background: #fff;
+}
+.ts-foot-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 900px) {
+  .rsv-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .ts-body { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .ts-head, .ts-body, .ts-foot { padding-left: 16px; padding-right: 16px; }
+  .ts-fields { grid-template-columns: minmax(0, 1fr); }
+  .ts-foot, .ts-foot-actions { flex-direction: column-reverse; align-items: stretch; }
+  .ts-foot .rsv-btn { width: 100%; justify-content: center; }
+}
+
+.ts-suggest {
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0B6FD0;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.ts-suggest:hover { text-decoration: underline; }

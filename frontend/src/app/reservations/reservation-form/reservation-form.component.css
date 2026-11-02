@@ -201,3 +201,8 @@
 .rsv-room-chip.busy small { color: #B91C1C; font-weight: 600; }
 .rsv-room-chip:disabled { cursor: not-allowed; opacity: 0.85; }
 .rsv-room-chip.active.busy { border-color: #DC2626; background: #FDECEC; }
+
+/* Dato que SOGO completó a partir de lo ya escrito (país, documento, fechas, tarifa) */
+.rsv-form-predicted { display: block; margin-top: 4px; font-size: 11.5px; line-height: 1.45; color: #0B6FD0; }
+.rsv-form-predicted::before { content: '✦ '; }
+.rsv-form-predicted--box { margin: -4px 0 14px; padding: 8px 12px; border-radius: 8px; background: #EEF5FD; }

@@ -1,6 +1,6 @@
 import { RatesService } from '../../lodging/rates.service';
 import { SEASON_LABEL, rateTypeOf } from '../../lodging/rates.model';
-import { Component, OnInit } from '@angular/core';
+import { Component, DoCheck, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -13,7 +13,10 @@ import { fmtDate, fmtMoney, paymentBadge } from '../reservation-format';
 import { RoomService } from '../../lodging/room.service';
 import { SettingsService } from '../../settings/settings.service';
 import { isoDate, isoDateTime } from '../../shared/date-utils';
-import { CO_DEPARTMENTS, COUNTRY_OPTIONS, Place, townsOf, parsePlace, formatPlace, isColombia } from '../../shared/colombia';
+import {
+  CO_DEPARTMENTS, COUNTRY_SEARCH, FREQUENT_COUNTRY_NAMES, DEPARTMENT_SEARCH, Place, parsePlace, formatPlace, isColombia, townSearch, townKey, splitTownKey
+} from '../../shared/colombia';
+import { SearchSelectComponent, SearchOption } from '../../shared/search-select/search-select.component';
 
 /** Quita espacios de más: "  maría   fernanda " → "maría fernanda". */
 const clean = (v?: string) => (v ?? '').trim().replace(/\s+/g, ' ');
@@ -23,6 +26,9 @@ const PLAN = 'Solo alojamiento';
 
 /** Día siguiente a una fecha YYYY-MM-DD. */
 const nextDay = (iso: string) => { const d = new Date(`${iso}T12:00`); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+/** Documento comparable: sin puntos, espacios ni guiones, en mayúsculas ("1.094.556" = "1094556"). */
+const normDoc = (v?: string) => (v ?? '').replace(/[\s.\-]/g, '').toUpperCase();
 import { Room } from '../../lodging/room.model';
 
 type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
@@ -30,7 +36,7 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
 @Component({
   selector: 'app-reservation-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, SearchSelectComponent],
   styleUrls: ['./reservation-form.component.css'],
   template: `
   <header class="rsv-header">
@@ -55,15 +61,19 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
       <div class="rsv-form-row">
         <div class="rsv-field">
           <label for="docType">Tipo de documento</label>
-          <select id="docType" class="rsv-input" [(ngModel)]="d.docType">
+          <select id="docType" class="rsv-input" [ngModel]="d.docType" (ngModelChange)="setDocType($event)">
             <option *ngFor="let o of docTypes">{{ o }}</option>
           </select>
+          <small class="rsv-form-predicted" *ngIf="docHint">{{ docHint }}</small>
         </div>
         <div class="rsv-field">
           <label for="docNumber">Número de documento *</label>
-          <input id="docNumber" type="text" class="rsv-input" [(ngModel)]="d.docNumber" placeholder="1234567890">
+          <input id="docNumber" type="text" class="rsv-input" [(ngModel)]="d.docNumber" (blur)="recallGuest()" placeholder="1234567890">
         </div>
       </div>
+      <p class="rsv-form-predicted rsv-form-predicted--box" *ngIf="recalled">
+        Huésped conocido: se completaron sus datos con los de su reserva {{ recalled.code }} ({{ recalled.date }}). Revisa que sigan vigentes.
+      </p>
       <div class="rsv-form-row">
         <div class="rsv-field">
           <label for="firstName">Nombres *</label>
@@ -88,23 +98,19 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
       <div class="rsv-form-row rsv-form-row--3">
         <div class="rsv-field">
           <label for="country">País</label>
-          <input id="country" type="text" class="rsv-input" list="rsv-countries" [(ngModel)]="place.country" (ngModelChange)="onCountry()" autocomplete="country-name" placeholder="Colombia">
-          <datalist id="rsv-countries"><option *ngFor="let c of countries" [value]="c"></option></datalist>
+          <app-search-select inputId="country" [options]="countries" [pinned]="frequentCountries" placeholder="Escribe el país…"
+                             [(ngModel)]="place.country" (ngModelChange)="onCountry()"></app-search-select>
         </div>
         <ng-container *ngIf="isColombia; else abroad">
           <div class="rsv-field">
             <label for="department">Departamento</label>
-            <select id="department" class="rsv-input" [(ngModel)]="place.department" (ngModelChange)="place.town = ''">
-              <option value="">Selecciona…</option>
-              <option *ngFor="let dep of departments" [value]="dep.name">{{ dep.name }}</option>
-            </select>
+            <app-search-select inputId="department" [options]="departments" placeholder="Escribe el departamento…"
+                               [(ngModel)]="place.department" (ngModelChange)="place.town = ''"></app-search-select>
           </div>
           <div class="rsv-field">
             <label for="town">Municipio</label>
-            <select id="town" class="rsv-input" [(ngModel)]="place.town" [disabled]="!place.department">
-              <option value="">{{ place.department ? 'Selecciona…' : 'Elige el departamento' }}</option>
-              <option *ngFor="let t of towns" [value]="t">{{ t }}</option>
-            </select>
+            <app-search-select inputId="town" [options]="towns" [placeholder]="place.department ? 'Escribe el municipio…' : 'Escribe el municipio (cualquier departamento)…'"
+                               [ngModel]="townValue" (ngModelChange)="pickTown($event)"></app-search-select>
           </div>
         </ng-container>
         <ng-template #abroad>
@@ -188,7 +194,7 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
       <div class="rsv-form-row">
         <div class="rsv-field">
           <label for="checkIn">Fecha de entrada *</label>
-          <input id="checkIn" type="date" class="rsv-input" [(ngModel)]="d.checkIn" [min]="isEdit ? '' : today" (ngModelChange)="calcNights()">
+          <input id="checkIn" type="date" class="rsv-input" [(ngModel)]="d.checkIn" [min]="isEdit ? '' : today" (ngModelChange)="onCheckIn()">
         </div>
         <div class="rsv-field">
           <label for="checkOut">Fecha de salida *</label>
@@ -218,10 +224,13 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
       <div class="rsv-form-row rsv-form-row--4">
         <div class="rsv-field">
           <label for="lodgingAmount">Valor alojamiento (COP) *</label>
-          <input id="lodgingAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.lodgingAmount">
+          <input id="lodgingAmount" type="number" min="0" step="1000" class="rsv-input" [(ngModel)]="d.lodgingAmount" (ngModelChange)="amountByHand = true">
+          <small class="rsv-form-predicted" *ngIf="suggestedAmount && +d.lodgingAmount === suggestedAmount && !amountByHand">
+            Calculado: tarifa {{ quote.label }} · temporada {{ quote.season }} · {{ money(quote.perNight) }} {{ quote.perDay ? 'por día' : '× ' + quote.units + ' noche' + (quote.units === 1 ? '' : 's') }}. Se actualiza solo al cambiar fechas o huéspedes.
+          </small>
           <small class="rsv-form-hint" *ngIf="suggestedAmount && +d.lodgingAmount !== suggestedAmount">
             Tarifa {{ quote.label }} · temporada {{ quote.season }} ({{ quote.reason.toLowerCase() }}): {{ money(quote.perNight) }} {{ quote.perDay ? 'por día' : '× ' + quote.units + ' noche' + (quote.units === 1 ? '' : 's') }} = {{ money(suggestedAmount) }}
-            <button type="button" (click)="d.lodgingAmount = suggestedAmount">Usar</button>
+            <button type="button" (click)="useSuggestedAmount()">Usar</button>
           </small>
           <small class="rsv-form-hint" *ngIf="total > 0 && policies.depositPct">
             Abono para confirmar ({{ policies.depositPct }} %): {{ money(depositDue) }} · check-in {{ policies.checkIn }} · check-out {{ policies.checkOut }}
@@ -292,7 +301,7 @@ type Draft = Omit<Reservation, 'id' | 'code' | 'createdAt' | 'updatedAt'>;
   </div>
   `
 })
-export class ReservationFormComponent implements OnInit {
+export class ReservationFormComponent implements OnInit, DoCheck {
 
   readonly docTypes = ['Cédula de Ciudadanía', 'Cédula de Extranjería', 'Pasaporte', 'Tarjeta de Identidad'];
   readonly channels = CHANNELS;
@@ -306,17 +315,98 @@ export class ReservationFormComponent implements OnInit {
   readonly money = fmtMoney;
   readonly paymentBadge = paymentBadge;
 
-  readonly departments = CO_DEPARTMENTS;
-  readonly countries = COUNTRY_OPTIONS;
+  readonly departments = DEPARTMENT_SEARCH;
+  readonly countries = COUNTRY_SEARCH;
+  readonly frequentCountries = FREQUENT_COUNTRY_NAMES;
   place: Place = { country: 'Colombia', department: '', town: '' };
   private placeLoaded = '';
   /** Lugar guardado que no se pudo ubicar en el catálogo (se muestra para elegirlo de nuevo). */
   placeUnmatched = '';
   get isColombia(): boolean { return isColombia(this.place.country); }
-  get towns(): string[] { return townsOf(this.place.department); }
+  /** Municipios del departamento elegido, o de todo el país para buscarlos directamente. */
+  get towns(): SearchOption[] { return townSearch(this.place.department); }
+  get townValue(): string { return townKey(this.place.department, this.place.town); }
+  /** Elegir el municipio llena también su departamento. */
+  pickTown(key: string): void {
+    const { department, town } = splitTownKey(key);
+    this.place = { ...this.place, department: town ? department : this.place.department, town };
+  }
   onCountry(): void {
     // Al pasar de Colombia a otro país (o al revés) lo elegido ya no aplica
     if (this.isColombia !== !!CO_DEPARTMENTS.find(d => d.name === this.place.department)) this.place = { ...this.place, department: '', town: '' };
+    this.predictDocType();
+  }
+
+  // ── Predicciones: SOGO completa lo que se deduce de lo ya escrito ──
+  // Solo toca campos que el usuario no ha cambiado a mano, y avisa debajo de cada uno.
+
+  /** Tipo de documento según el país: del exterior → pasaporte; Colombia → cédula. */
+  docHint = '';
+  private docByHand = false;
+  private docBySogo = false;
+
+  setDocType(v: string): void {
+    this.d.docType = v;
+    this.docByHand = true;
+    this.docHint = '';
+  }
+
+  private predictDocType(): void {
+    if (this.isEdit || this.docByHand) return;
+    const abroad = !this.isColombia && !!this.place.country.trim();
+    const next = abroad ? 'Pasaporte' : 'Cédula de Ciudadanía';
+    // Sobre la cédula por defecto o lo que puso SOGO; nunca sobre cédula de extranjería o tarjeta de identidad elegidas
+    if (this.d.docType === next || !(this.d.docType === 'Cédula de Ciudadanía' || this.docBySogo)) return;
+    this.d.docType = next;
+    this.docBySogo = abroad;
+    this.docHint = abroad ? `Sugerido porque el país es ${this.place.country}. Cámbialo si tiene cédula de extranjería.` : '';
+  }
+
+  /** Huésped que ya se hospedó: al escribir su documento se completan los datos de su última reserva. */
+  recalled?: { code: string; date: string };
+
+  recallGuest(): void {
+    if (this.isEdit) return;
+    const doc = normDoc(this.d.docNumber);
+    if (doc.length < 5) return;
+    const last = this.svc.getSnapshot()
+      .filter(r => normDoc(r.docNumber) === doc)
+      .sort((a, b) => (b.checkIn || '').localeCompare(a.checkIn || ''))[0];
+    if (!last || this.recalled?.code === last.code) return;
+    const fill = (k: 'firstName' | 'lastName' | 'phone' | 'email', v?: string) => { if (!this.d[k]?.trim() && v?.trim()) this.d[k] = v.trim(); };
+    const [first, lastNames] = last.lastName?.trim() ? [last.firstName, last.lastName] : splitFullName(last.guestName);
+    fill('firstName', first);
+    fill('lastName', lastNames);
+    fill('phone', last.phone);
+    fill('email', last.email);
+    if (!this.docByHand && last.docType) { this.d.docType = last.docType; this.docBySogo = false; this.docHint = ''; }
+    // El lugar solo si aún no se ha elegido
+    if (isColombia(this.place.country) && !this.place.department && !this.place.town && last.city?.trim()) this.place = parsePlace(last.city);
+    this.recalled = { code: last.code, date: fmtDate(last.checkIn) };
+  }
+
+  /** Salida al día siguiente de la entrada (o el mismo día en pasadías), si aún no hay una válida. */
+  onCheckIn(): void {
+    if (this.d.checkIn) {
+      const pasadia = this.d.reservationType === 'Evento / Pasadía';
+      if (pasadia && (!this.d.checkOut || this.d.checkOut < this.d.checkIn)) this.d.checkOut = this.d.checkIn;
+      if (!pasadia && (!this.d.checkOut || this.d.checkOut <= this.d.checkIn)) this.d.checkOut = nextDay(this.d.checkIn);
+    }
+    this.calcNights();
+  }
+
+  /** El valor del alojamiento sigue a la tarifa (fechas, tipo y huéspedes) hasta que se escribe a mano. */
+  amountByHand = false;
+
+  useSuggestedAmount(): void {
+    this.d.lodgingAmount = this.suggestedAmount;
+    this.amountByHand = false;
+  }
+
+  ngDoCheck(): void {
+    if (this.isEdit || this.amountByHand) return;
+    const s = this.suggestedAmount;
+    if (s > 0 && +this.d.lodgingAmount !== s) this.d.lodgingAmount = s;
   }
 
   isEdit = false;
@@ -412,6 +502,9 @@ export class ReservationFormComponent implements OnInit {
   }
 
   onTypeChange(): void {
+    // Pasadía: entra y sale el mismo día; al dejar de serlo, la salida pasa al día siguiente
+    if (this.d.checkIn && this.d.reservationType === 'Evento / Pasadía') this.d.checkOut = this.d.checkIn;
+    else if (this.d.checkIn && this.d.checkOut === this.d.checkIn) this.d.checkOut = nextDay(this.d.checkIn);
     this.calcNights();
   }
 

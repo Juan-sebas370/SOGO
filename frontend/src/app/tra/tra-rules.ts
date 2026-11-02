@@ -4,7 +4,7 @@ import {
   TraRecord, TraGuest, TravelData, TraViewStatus, SendStatus, TraSettings, LodgingUnit
 } from './tra.model';
 import {
-  DOCUMENT_TYPES, TRAVEL_REASONS, ACCOMMODATION_TYPES, FOREIGN_DOCUMENTS, COUNTRIES, CITIES, city, country
+  DOCUMENT_TYPES, TRAVEL_REASONS, ACCOMMODATION_TYPES, FOREIGN_DOCUMENTS, COUNTRIES, CITIES, city, country, usesCityCatalog
 } from './tra-catalogs';
 
 // Reglas de negocio de la TRA como funciones puras: las usan el servicio,
@@ -41,7 +41,29 @@ export function isMinor(rec: TraRecord, g: TraGuest): boolean {
   return g.docType === 'TI' || (age !== undefined && age < 18);
 }
 
-/** Extranjero: además de la TRA, se reporta al SIRE (módulo aparte). */
+/**
+ * Tipo de documento que se deduce de lo ya registrado: reside fuera de Colombia → pasaporte;
+ * reside en Colombia → tarjeta de identidad si es menor, cédula si no. `undefined` sin residencia.
+ */
+export function suggestedDocType(rec: TraRecord, g: TraGuest): { code: string; reason: string } | undefined {
+  const t = travelOf(rec, g);
+  if (!t.residenceCountry) return undefined;
+  if (t.residenceCountry !== 'CO') return { code: 'PA', reason: `reside en ${country(t.residenceCountry)?.name ?? 'el exterior'}` };
+  const age = ageOn(g.birthDate, t.checkIn || principalOf(rec).travel.checkIn);
+  return age !== undefined && age < 18 ? { code: 'TI', reason: 'es menor de edad' } : { code: 'CC', reason: 'reside en Colombia' };
+}
+
+/**
+ * ¿Se puede cambiar el tipo por la sugerencia? Solo si está vacío, si lo puso SOGO, o si es una
+ * cédula (el valor por defecto de la reserva) y la sugerencia la corrige: pasaporte o tarjeta de identidad.
+ * Un tipo elegido a mano (CE, PPT, PEP, DNI…) nunca se toca.
+ */
+export function canSuggestDoc(current: string, suggested: string, setBySogo: boolean): boolean {
+  if (current === suggested) return false;
+  return !current || setBySogo || (current === 'CC' && (suggested === 'PA' || suggested === 'TI'));
+}
+
+/** Extranjero: además de la TRA, se reporta al SIRE (TRA › SIRE · Extranjeros). */
 export const needsSire = (g: TraGuest): boolean => FOREIGN_DOCUMENTS.includes(g.docType);
 
 // ── Completitud por huésped ────────────────────────────
@@ -60,8 +82,8 @@ export function guestIssues(rec: TraRecord, g: TraGuest): string[] {
   if (inherits(g)) return out;
 
   const t = g.travel;
-  if (!t.residenceCountry || !t.residenceCity) out.push(`Falta país o ciudad de residencia ${of}`);
-  if (!t.originCountry || !t.originCity)       out.push(`Falta país o ciudad de procedencia ${of}`);
+  if (!t.residenceCountry || !t.residenceCity?.trim()) out.push(`Falta país o ciudad de residencia ${of}`);
+  if (!t.originCountry || !t.originCity?.trim())       out.push(`Falta país o ciudad de procedencia ${of}`);
   if (!t.reasonId)                             out.push(`Motivo de viaje no seleccionado ${of}`);
   if (!t.checkIn || !t.checkOut)               out.push(`Faltan fechas de entrada y salida ${of}`);
   return out;
@@ -149,8 +171,14 @@ export function validate(rec: TraRecord, r: Reservation, settings: TraSettings, 
   const valueOk = rec.units.every(u => +u.totalValue > 0);
   if (!valueOk) issues.push({ message: 'El valor total del alojamiento debe ser mayor a cero' });
 
-  // 8. Catálogos: códigos válidos y ciudad que pertenece al país
-  const place = (countryId: string, cityId: string) => !countryId || !cityId || (!!country(countryId) && city(cityId)?.countryId === countryId);
+  // 8. Catálogos: códigos válidos; en Colombia la ciudad es del catálogo DANE y del país,
+  //    en el exterior es el nombre escrito (o una ciudad del catálogo de ese país).
+  const place = (countryId: string, cityId: string) => {
+    if (!countryId || !cityId) return true;
+    if (!country(countryId)) return false;
+    const known = city(cityId);
+    return known ? known.countryId === countryId : !usesCityCatalog(countryId);
+  };
   const codesOk = rec.guests.every(g => {
     const t = travelOf(rec, g);
     return (!g.docType || DOCUMENT_TYPES.some(d => d.code === g.docType))
@@ -207,12 +235,18 @@ export function splitName(name: string): [string, string] {
   return [words.slice(0, n).join(' '), words.slice(n).join(' ')];
 }
 
-/** "Colombia - Neiva, Huila" → { country: 'CO', city: '41001' } si están en el catálogo. */
+/**
+ * "Colombia - Neiva, Huila" → { country: 'CO', city: '41001' } si están en el catálogo.
+ * Una ciudad del exterior que no está en el catálogo se conserva como texto ("Chile - Valparaíso").
+ */
 function placeFrom(text: string): { country: string; city: string } {
   const [countryName = '', rest = ''] = text.split(' - ');
-  const cityName = rest.split(',')[0].trim();
+  const [cityName = '', depName = ''] = rest.split(',').map(x => x.trim());
   const c = COUNTRIES.find(x => x.name === countryName.trim());
-  return { country: c?.id ?? '', city: CITIES.find(x => x.name === cityName && x.countryId === c?.id)?.id ?? '' };
+  // Hay municipios con el mismo nombre (Armenia, Quindío y Antioquia): se prefiere el del departamento
+  const same = CITIES.filter(x => x.name === cityName && x.countryId === c?.id);
+  const known = (same.find(x => x.department === depName) ?? same[0])?.id;
+  return { country: c?.id ?? '', city: known ?? (c && !usesCityCatalog(c.id) ? cityName : '') };
 }
 
 /** TRA en borrador con el huésped principal y la unidad tomados de la reserva. */
@@ -234,7 +268,8 @@ export function draftFor(r: Reservation, units: LodgingUnit[], now: string): Tra
       id: `${r.id}-g1`, role: 'PRINCIPAL', unitId: ids[0],
       docType: DOC_FROM_RESERVATION[r.docType] ?? '', docNumber: r.docNumber, firstNames, lastNames,
       ownTravel: true,
-      travel: { residenceCountry: home.country, residenceCity: home.city, originCountry: '', originCity: '', reasonId: null, checkIn: r.checkIn, checkOut: r.checkOut },
+      // La procedencia casi siempre es la residencia: queda igual hasta que se cambie
+      travel: { residenceCountry: home.country, residenceCity: home.city, originCountry: home.country, originCity: home.city, reasonId: null, checkIn: r.checkIn, checkOut: r.checkOut },
       phone: r.phone, email: r.email, birthDate: '',
     }],
     sends: [],

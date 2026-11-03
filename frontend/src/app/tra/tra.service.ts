@@ -15,6 +15,13 @@ import {
 import { DEFAULT_UNITS } from './tra-catalogs';
 import { Validation, validate, draftFor, requiresTra, fullName, principalOf } from './tra-rules';
 import { sireMovements } from './sire-rules';
+import { sireCityCode } from './sire-codes';
+import { matchColombia } from '../shared/colombia';
+
+const sireCityFor = (municipality: string, department: string) => {
+  const { department: dep, town } = matchColombia(department, municipality);
+  return sireCityCode(town, dep);
+};
 import { TraGatewayService, GatewayResult } from './tra-gateway.service';
 
 /** Una fila del panel: la reserva con su TRA (las pasadías no tienen). */
@@ -108,6 +115,8 @@ export class TraService {
       department, municipality, address: h.address, phone: this.hotel.phones, email: h.email, website: h.website,
       capacity: summaryOf(ROOMS.map(r => r.number)).capacity,
       autoRetry: true, maxAttempts: 3, retryMinutes: 15, notifyErrors: true,
+      // Código SIRE asignado por Migración Colombia; la ciudad sale del municipio del hospedaje
+      sireHotelCode: '94131', sireCityCode: sireCityFor(municipality, department),
     };
   }
 

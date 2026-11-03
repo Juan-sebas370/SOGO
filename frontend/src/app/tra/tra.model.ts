@@ -183,4 +183,7 @@ export interface TraSettings {
   maxAttempts:      number;
   retryMinutes:     number;
   notifyErrors:     boolean;
+  // SIRE (archivo plano): encabezan cada línea del TXT
+  sireHotelCode?:   string;    // Código SIRE del establecimiento
+  sireCityCode?:    string;    // Código de ciudad del establecimiento (DANE sin el cero inicial)
 }

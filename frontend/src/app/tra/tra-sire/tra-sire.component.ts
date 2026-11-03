@@ -11,6 +11,8 @@ import { TraRecord, TraGuest, SireGuestData, SireMovement } from '../tra.model';
 import { COUNTRIES, COUNTRY_OPTIONS, FREQUENT_COUNTRIES, docTypeLabel } from '../tra-catalogs';
 import { SearchSelectComponent } from '../../shared/search-select/search-select.component';
 import { fullName, fmtDoc, fmtStamp, travelOf } from '../tra-rules';
+import { sireTxt, missingCodes } from '../sire-file';
+import { sireCodes } from '../sire-codes';
 import {
   SIRE_PORTAL, sireDataOf, sireIssues, sireFormFields, sireStatusLabel, sireStatusBadge, isDue, dmy
 } from '../sire-rules';
@@ -31,6 +33,16 @@ interface Line {
 interface Group { date: string; lines: Line[]; }
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+/**
+ * Texto en ANSI (Windows-1252), como el «texto delimitado por tabulaciones» de Excel que pide la guía
+ * del SIRE: la Ñ y las tildes van en un byte. Lo que no cabe se escribe sin tilde (o «?»).
+ */
+export function ansi(text: string): Uint8Array {
+  const byte = (c: string) => (c.charCodeAt(0) < 256 ? c.charCodeAt(0) : 63);
+  return Uint8Array.from([...text].flatMap(ch => ch.charCodeAt(0) < 256 ? [ch.charCodeAt(0)]
+    : [...ch.normalize('NFD').replace(/\p{Diacritic}/gu, '')].map(byte)));
+}
 
 // SIRE (Migración Colombia) dentro del módulo TRA. El SIRE no tiene API: esta pantalla
 // dice qué extranjeros reportar cada día, entrega los datos en el orden del formulario
@@ -135,11 +147,19 @@ const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').to
           <strong>Fecha de movimiento: {{ dmy(grp.date) }}</strong>
           <span class="tra-muted"> · {{ grp.lines.length }} registro{{ grp.lines.length === 1 ? '' : 's' }}</span>
         </div>
-        <button type="button" class="rsv-btn rsv-btn--primary rsv-btn--sm" *ngIf="canEdit && selectable(grp).length"
-                [disabled]="!selectedIn(grp).length" (click)="markGroup(grp)">
-          Marcar {{ selectedIn(grp).length || '' }} como reportado{{ selectedIn(grp).length === 1 ? '' : 's' }}
-        </button>
+        <div class="ts-group-actions" *ngIf="selectable(grp).length">
+          <button type="button" class="rsv-btn rsv-btn--outline rsv-btn--sm" (click)="downloadTxt(grp)"
+                  [title]="'Archivo para SIRE › Alojamiento y Hospedaje › Cargar Archivo'">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar TXT ({{ txtLines(grp).length }})
+          </button>
+          <button type="button" class="rsv-btn rsv-btn--primary rsv-btn--sm" *ngIf="canEdit"
+                  [disabled]="!selectedIn(grp).length" (click)="markGroup(grp)">
+            Marcar {{ selectedIn(grp).length || '' }} como reportado{{ selectedIn(grp).length === 1 ? '' : 's' }}
+          </button>
+        </div>
       </div>
+      <p class="ts-txt-note" *ngIf="txtNote?.date === grp.date">{{ txtNote!.text }}</p>
       <div class="rsv-table-wrap">
         <table class="rsv-table">
           <thead>
@@ -398,6 +418,40 @@ export class TraSireComponent implements OnDestroy {
   allSelected(grp: Group): boolean { const s = this.selectable(grp); return !!s.length && s.every(l => this.selected.has(l.key)); }
   toggle(l: Line): void { this.selected.has(l.key) ? this.selected.delete(l.key) : this.selected.add(l.key); }
   selectAll(grp: Group, on: boolean): void { this.selectable(grp).forEach(l => on ? this.selected.add(l.key) : this.selected.delete(l.key)); }
+
+  // ── Archivo plano (TXT) ──────────────────────────────
+  txtNote?: { date: string; text: string };
+
+  /** Lo seleccionado del grupo; sin selección, todo lo que se puede reportar. */
+  txtLines(grp: Group): Line[] {
+    const sel = this.selectedIn(grp);
+    return sel.length ? sel : this.selectable(grp);
+  }
+
+  /**
+   * Descarga el TXT del SIRE con los movimientos de una misma fecha (el SIRE solo acepta juntos
+   * los de la misma fecha). Quien no tenga todos sus códigos queda por fuera y se avisa.
+   */
+  downloadTxt(grp: Group): void {
+    const s = this.svc.getSettings();
+    const codes = sireCodes(s.sireHotelCode ?? '', s.sireCityCode ?? '');
+    const lines = this.txtLines(grp).map(l => ({ l, sl: { rec: l.rec, guest: l.g, type: l.m.type, date: l.m.date } }));
+    const ok = lines.filter(x => !missingCodes(x.sl, codes).length);
+    const skipped = lines.filter(x => missingCodes(x.sl, codes).length)
+      .map(x => `${fullName(x.l.g)}: falta ${missingCodes(x.sl, codes).join(', ').toLowerCase()}`);
+    if (!ok.length) {
+      this.txtNote = { date: grp.date, text: `No se generó el archivo. ${skipped.join(' · ')}. Revisa Configuración TRA › SIRE o repórtalos por formulario.` };
+      return;
+    }
+    const bytes = ansi(sireTxt(ok.map(x => x.sl), codes));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'text/plain' }));
+    a.download = `SIRE_${codes.hotel || 'hotel'}_${grp.date}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    this.txtNote = { date: grp.date, text: `Archivo con ${ok.length} registro${ok.length === 1 ? '' : 's'}: súbelo en SIRE › Cargar Información › Alojamiento y Hospedaje › Cargar Archivo y, cuando el SIRE los muestre como válidos, márcalos aquí como reportados.`
+      + (skipped.length ? ` Quedaron por fuera (repórtalos por formulario): ${skipped.join(' · ')}.` : '') };
+  }
 
   markGroup(grp: Group): void {
     const lines = this.selectedIn(grp);

@@ -9,6 +9,8 @@ import {
   DOCUMENT_TYPES, TRAVEL_REASONS, COUNTRIES, CITIES, ACCOMMODATION_TYPES, ACCOMMODATION_CATALOG_PROVISIONAL, UNIT_TYPES
 } from '../tra-catalogs';
 import { fmtStamp } from '../tra-rules';
+import { sireCityCode } from '../sire-codes';
+import { matchColombia } from '../../shared/colombia';
 import { ROOMS, roomByNumber, roomDescription, summaryOf } from '../../lodging/house';
 
 type Test = { state: 'idle' | 'testing' | 'ok' | 'error'; message: string };
@@ -99,6 +101,27 @@ const ALL_ROOMS = ROOMS.map(r => r.number);
           <div class="rsv-field"><label>Número de unidades</label><input class="rsv-input" [value]="activeUnits" readonly><small>Unidades activas</small></div>
           <div class="rsv-field"><label for="e-cap">Capacidad (plazas)</label><input id="e-cap" type="number" min="1" class="rsv-input" [(ngModel)]="form.capacity"></div>
         </fieldset>
+      </section>
+
+      <!-- SIRE: datos del archivo plano -->
+      <section class="tra-card">
+        <h2 class="tra-card-title">SIRE · Migración Colombia</h2>
+        <p class="tra-card-sub">Encabezan cada línea del archivo TXT que se sube al SIRE (Alojamiento y Hospedaje › Cargar Archivo).</p>
+        <div class="tra-grid tra-grid--2">
+          <div class="rsv-field">
+            <label for="s-hotel">Código SIRE del establecimiento</label>
+            <input id="s-hotel" class="rsv-input tra-mono" inputmode="numeric" [(ngModel)]="form.sireHotelCode" placeholder="Ej.: 94131">
+            <small>En el SIRE: Actualizar Datos Persona Jurídica › Código SIRE.</small>
+          </div>
+          <div class="rsv-field">
+            <label for="s-city">Código de ciudad del establecimiento</label>
+            <input id="s-city" class="rsv-input tra-mono" inputmode="numeric" [(ngModel)]="form.sireCityCode" [placeholder]="suggestedSireCity || 'Código DANE sin el cero inicial'">
+            <small *ngIf="suggestedSireCity && form.sireCityCode !== suggestedSireCity">
+              {{ form.municipality }} ({{ form.department }}) es {{ suggestedSireCity }} ·
+              <button type="button" class="tc-link" (click)="form.sireCityCode = suggestedSireCity">Usar</button>
+            </small>
+          </div>
+        </div>
       </section>
 
       <!-- Unidades -->
@@ -272,6 +295,12 @@ export class TraConfigComponent {
       this.lastSend = rows.flatMap(r => r.record?.sends ?? []).filter(s => s.attemptAt && s.status !== 'ENVIANDO')
         .sort((a, b) => b.attemptAt!.localeCompare(a.attemptAt!))[0];
     });
+  }
+
+  /** Código de ciudad del SIRE del municipio del establecimiento (DANE sin el cero inicial). */
+  get suggestedSireCity(): string {
+    const { department, town } = matchColombia(this.form.department, this.form.municipality);
+    return sireCityCode(town, department);
   }
 
   get dirty(): boolean { return JSON.stringify(this.form) !== JSON.stringify(this.current); }

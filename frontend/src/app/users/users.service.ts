@@ -455,12 +455,14 @@ export class UsersService {
     };
     this.events = [...this.events, draft];
     this.events$.next(this.events);
-    if (!localStorage.getItem('sogo_token')) return;
+    // La sesión se toma ahora: el envío va en fila y, al cerrar sesión, sale cuando el token ya se borró
+    const token = localStorage.getItem('sogo_token');
+    if (!token) return;
     this.auditQueue.run(async () => {
       const saved = dropNulls(await firstValueFrom(this.http.post<AuditEvent>(`${this.base}/auditoria`, {
         user: user === 'sistema' ? 'sistema' : undefined, module: draft.module, action: draft.action, detail: draft.detail,
         object: draft.object, result: draft.result, changes: draft.changes, reason: draft.reason, device: draft.device,
-      })));
+      }, { headers: { Authorization: `Bearer ${token}` } })));
       this.events = this.events.map(x => x === draft ? saved : x);
       this.events$.next(this.events);
     });

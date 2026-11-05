@@ -5,7 +5,7 @@ SOGO y la página web no se conectan entre sí: las dos usan **la misma base de 
 ```text
 hospedajesebastianfilandia.com           → página web (Render, ya desplegada)
 sogo.hospedajesebastianfilandia.com      → sogo-web (Render, sitio estático)
-sogo-api.hospedajesebastianfilandia.com  → sogo-api (Render, Docker)
+sogo-api-1kq4.onrender.com               → sogo-api (Render, Docker; sin dominio propio)
                  hospedaje-sebastian-api y sogo-api → misma base en Aiven
 ```
 
@@ -76,20 +76,21 @@ En Render: **New → Blueprint** → repositorio `SOGO` (usa `render.yaml`). Te 
 
 ## 5. Conectar el dominio en Cloudflare
 
-1. En cada servicio de Render: *Settings → Custom Domains*. Agrega
-   `sogo.hospedajesebastianfilandia.com` en `sogo-web` y `sogo-api.hospedajesebastianfilandia.com` en `sogo-api`.
+1. En `sogo-web` de Render: *Settings → Custom Domains* → agrega `sogo.hospedajesebastianfilandia.com`.
+   `sogo-api` se queda en `https://sogo-api-1kq4.onrender.com`: el plan de Render solo da 2 dominios propios
+   gratis (ya los usan la API de la página y `sogo-web`). Esa dirección está en
+   `frontend/src/environments/environment.production.ts`.
 2. En Cloudflare → *DNS*, crea estos registros en modo **DNS only** (nube gris) hasta que Render emita el certificado:
 
 | Tipo | Nombre | Destino |
 |---|---|---|
 | CNAME | `sogo` | dirección `.onrender.com` de `sogo-web` |
-| CNAME | `sogo-api` | dirección `.onrender.com` de `sogo-api` |
 
 ## 6. Configurar Google
 
 En Google Cloud → *Credentials*, autoriza esta dirección de redirección:
 
-`https://sogo-api.hospedajesebastianfilandia.com/login/oauth2/code/google`
+`https://sogo-api-1kq4.onrender.com/login/oauth2/code/google`
 
 ## 7. Crear el administrador
 

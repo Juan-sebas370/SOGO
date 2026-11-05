@@ -6,6 +6,7 @@ import { AuthService } from '../auth.service';
 import { API_ROOT } from '../api';
 import { UsersService } from '../users/users.service';
 import { AuthShellComponent } from '../auth-shell/auth-shell.component';
+import { LOAD_ERROR_KEY } from '../auth.guard';
 
 const RECORDAR_KEY = 'sogo_remember_user';
 
@@ -122,6 +123,11 @@ export class LoginComponent implements OnInit {
       this.router.navigate(['/dashboard']);
       return;
     }
+    // Motivo de una carga fallida al entrar (lo deja authGuard)
+    try {
+      const loadError = sessionStorage.getItem(LOAD_ERROR_KEY);
+      if (loadError) { this.error = loadError; sessionStorage.removeItem(LOAD_ERROR_KEY); }
+    } catch { /* sin almacenamiento */ }
     const recordado = localStorage.getItem(RECORDAR_KEY);
     if (recordado) {
       this.username = recordado;
@@ -135,7 +141,8 @@ export class LoginComponent implements OnInit {
       'con activación vencida': 'El plazo para activar tu cuenta venció. Pide al administrador que reenvíe la activación.',
       'sin acceso a SOGO': 'Tu cuenta no tiene un rol de SOGO asignado. Pide al administrador que te asigne uno.',
     };
-    if (oauthError && oauthMotivos[oauthError]) this.error = oauthMotivos[oauthError];
+    if (this.error) { /* ya hay un motivo de carga fallida */ }
+    else if (oauthError && oauthMotivos[oauthError]) this.error = oauthMotivos[oauthError];
     else if (oauthError === 'no-email') this.error = 'El proveedor no compartió tu correo. Inicia sesión con usuario y contraseña.';
     this.auth.getOAuthProviders().subscribe({
       next: (p) => { this.oauthProviders = p; this.oauthReady = true; },
@@ -167,7 +174,9 @@ export class LoginComponent implements OnInit {
         localStorage.setItem('sogo_username', r.username || this.username);
         localStorage.setItem('sogo_fullname', r.fullName || '');
         localStorage.setItem('sogo_email', r.email || '');
-        this.router.navigate(['/dashboard']);
+        // Sigue «cargando» mientras llegan los datos; si fallan, authGuard vuelve aquí con el motivo
+        this.loading = true;
+        this.router.navigate(['/dashboard']).finally(() => this.loading = false);
       },
       error: (e) => {
         this.loading = false;

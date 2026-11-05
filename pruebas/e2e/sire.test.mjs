@@ -3,11 +3,14 @@
 // SIRE (entrada) → check-out → SIRE (salida). Prueba también los buscadores y las
 // predicciones (país → pasaporte, huésped conocido, salida al día siguiente).
 //
-//   QA_WEB=http://localhost:4291 QA_API=http://127.0.0.1:8091 node --test pruebas/e2e/sire.test.mjs
+//   QA_WEB=http://localhost:4291 QA_API=http://127.0.0.1:8091 QA_ADMIN=... QA_PASS=... \
+//   node --test pruebas/e2e/sire.test.mjs
+//
+// Deja en pruebas/e2e/capturas/ las capturas 20 a 31 y el TXT de ejemplo (huéspedes ficticios).
 // =====================================================================
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, copyFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import puppeteer from '../../frontend/node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer-core.js';
@@ -17,8 +20,10 @@ const API = process.env.QA_API ?? 'http://127.0.0.1:8091';
 if (/:4201\b/.test(WEB) || /:8081\b/.test(API)) throw new Error('Las pruebas E2E nunca se corren contra el SOGO real (4201/8081).');
 const CHROME = process.env.CHROME_BIN ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), 'capturas');
-const ADMIN = process.env.QA_ADMIN ?? 'sebastian@gmail.com';
-const PASS = process.env.QA_PASS ?? 'Prueba#2026';
+// Credenciales del administrador de PRUEBA: solo por variables de entorno, nunca escritas aquí.
+const ADMIN = process.env.QA_ADMIN;
+const PASS = process.env.QA_PASS;
+if (!ADMIN || !PASS) throw new Error('Define QA_ADMIN y QA_PASS con el usuario administrador de la base de prueba.');
 
 const pad = (n) => String(n).padStart(2, '0');
 const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -195,6 +200,7 @@ describe('SIRE', () => {
     assert.equal(mary(await rows()), 1, 'Mary debe seguir pendiente');
     await clickText('.rsv-tab', 'Reportados');
     assert.equal(larry(await rows()), 1, 'Larry debe estar en Reportados');
+    await shot('26-sire-reportados');
   });
 
   test('tras el check-out aparece la salida', async () => {
@@ -213,5 +219,104 @@ describe('SIRE', () => {
     const items = await page.$$eval('.td-sire-list li', els => els.map(e => e.innerText.replace(/\s+/g, ' ')));
     assert.ok(items.some(t => /Entrada · Larry.*Reportado/.test(t)), items.join(' | '));
     assert.ok(items.some(t => /Salida · Mary/.test(t)));
+    await page.$eval('.td-sire-list', e => e.scrollIntoView({ block: 'center' }));
+    await shot('27-tra-detalle-reportado');
+  });
+
+  test('«Desmarcar reportado» devuelve el movimiento a «Por reportar»', async () => {
+    await go('/dashboard/tra/sire');
+    await page.waitForSelector('.ts-group');
+    await clickText('.rsv-tab', 'Reportados');
+    await openRow(t => t.includes(DOC) && !t.includes(`${DOC}B`) && t.includes('Entrada'));
+    await clickText('.ts-foot button', 'Desmarcar reportado');      // el confirm() lo acepta page.on('dialog')
+    await clickText('.ts-foot button', 'Cerrar');
+    await clickText('.rsv-tab', 'Por reportar');
+    const rows = await page.$$eval('.ts-group tbody tr', els => els.map(e => e.innerText));
+    assert.ok(rows.some(t => t.includes(DOC) && !t.includes(`${DOC}B`) && t.includes('Entrada')), 'La entrada de Larry debe volver a «Por reportar»');
+    await shot('28-sire-desmarcado');
   });
 });
+
+describe('SIRE · códigos y archivo TXT', () => {
+  test('Configuración TRA trae el código SIRE del establecimiento y el de la ciudad', async () => {
+    await go('/dashboard/tra/config');
+    await page.waitForSelector('#s-hotel');
+    assert.equal(await value('#s-hotel'), '94131');
+    assert.match(await value('#s-city'), /^\d+$/, 'El código de ciudad debe ser numérico (DANE sin el cero inicial)');
+    const card = (await page.evaluateHandle(() => document.querySelector('#s-hotel').closest('section'))).asElement();
+    await card.evaluate(e => e.scrollIntoView({ block: 'center' }));
+    await card.screenshot({ path: join(SHOTS, '29-config-sire.png') });
+  });
+
+  test('el TXT trae las 13 columnas y avisa el movimiento que quedó por fuera', async () => {
+    // Mary con nacionalidad Sudán del Sur: sus datos están completos, pero ese país no tiene código en el SIRE.
+    await go('/dashboard/tra/sire');
+    await page.waitForSelector('.ts-group');
+    await openRow(t => t.includes(`${DOC}B`) && t.includes('Entrada'));
+    await search('#ts-nat', 'Sudán del Sur');
+    await setDate('#ts-bd', '1982-07-20');
+    await clickText('.ts-foot button', 'Guardar datos');
+    await clickText('.ts-foot button', 'Cerrar');
+
+    const cdp = await page.createCDPSession();
+    await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: SHOTS });
+    const file = join(SHOTS, `SIRE_94131_${TODAY}.txt`);
+    await rm(file, { force: true });
+    const group = (await page.evaluateHandle(d => [...document.querySelectorAll('.ts-group')]
+      .find(g => g.querySelector('tbody')?.innerText.includes(d)), DOC)).asElement();
+    assert.ok(group, 'No aparece el grupo con los movimientos de hoy');
+    await (await group.$('.ts-group-actions button')).click();
+    for (let i = 0; i < 50 && !(await exists(file)); i++) await settle();
+
+    const note = await group.$eval('.ts-txt-note', e => e.textContent);
+    assert.match(note, /Quedaron por fuera/);
+    assert.match(note, /Mary Waytt \(entrada\): falta código de nacionalidad/i);
+    await group.evaluate(e => e.scrollIntoView({ block: 'start' }));
+    await shot('30-txt-movimiento-omitido');
+
+    const lines = latin1(await readFile(file)).split('\r\n').filter(Boolean);
+    const larry = lines.map(l => l.split('\t')).find(c => c[3] === DOC && c[8] === 'S');
+    assert.ok(larry, `Falta la salida de Larry en el TXT:\n${lines.join('\n')}`);
+    assert.equal(larry.length, 13);
+    assert.deepEqual([larry[0], larry[2], larry[4], larry[5], larry[6], larry[7]], ['94131', '3', '211', 'WAYTT', 'COST', 'LARRY']);
+    assert.ok(!lines.some(l => l.includes(`${DOC}B`)), 'Mary no debía entrar al archivo');
+    await copyFile(file, join(SHOTS, 'SIRE_ejemplo.txt'));
+    await rm(file, { force: true });
+    await showTxt(lines, '31-txt-sire');
+  });
+});
+
+/** Abre la ficha SIRE de la primera fila que cumpla la condición. */
+async function openRow(match) {
+  const rows = await page.$$('.ts-group tbody tr');
+  const found = (await Promise.all(rows.map(async r => [r, await r.evaluate(e => e.innerText)]))).find(([, t]) => match(t));
+  assert.ok(found, 'No se encontró la fila buscada en la pantalla SIRE');
+  await (await found[0].$('button')).click();
+  await page.waitForSelector('.ts-modal');
+}
+
+const exists = (f) => stat(f).then(() => true, () => false);
+const latin1 = (buf) => new TextDecoder('windows-1252').decode(buf);
+
+/** Captura del TXT como lo vería un editor: una línea por movimiento y las 13 columnas con su nombre. */
+async function showTxt(lines, name) {
+  const esc = (s) => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const head = SIRE_COLUMNS.map(c => `<th>${esc(c)}</th>`).join('');
+  const body = lines.map(l => `<tr>${l.split('\t').map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+  const raw = esc(lines.join('\n')).replace(/\t/g, '<span class="tab">→</span>');
+  const view = await browser.newPage();
+  await view.setViewport({ width: 1440, height: 600 });
+  await view.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
+  await view.setContent(`<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light"><style>
+    html,body{background:#fff} body{font:14px system-ui;margin:24px;color:#222} td{color:#222} h2{font-size:16px;margin:0 0 8px}
+    pre{background:#f6f6f6;border:1px solid #ddd;padding:12px;font:13px Consolas,monospace;white-space:pre}
+    .tab{color:#c33} table{border-collapse:collapse;font:12px Consolas,monospace;margin-top:16px}
+    th,td{border:1px solid #ccc;padding:4px 6px;text-align:left} th{background:#eee;font:600 11px system-ui}
+  </style><h2>SIRE_ejemplo.txt · ANSI (Windows-1252) · → = TAB · huéspedes ficticios</h2>
+  <pre>${raw}</pre><table><tr>${head}</tr>${body}</table>`);
+  await view.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
+  await view.close();
+}
+
+const SIRE_COLUMNS = ['Código hotel', 'Código ciudad', 'Tipo doc.', 'Número doc.', 'Nacionalidad', 'Primer apellido',
+  'Segundo apellido', 'Nombres', 'Movimiento', 'Fecha movimiento', 'Procedencia', 'Destino', 'Fecha nacimiento'];

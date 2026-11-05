@@ -1,0 +1,32 @@
+SOGO · Prueba E2E del SIRE (entorno de pruebas: web 4291, API 8091, MySQL 3307)
+Fecha: 2026-11-05 15:08 · node --test --test-reporter=spec pruebas/e2e/sire.test.mjs
+
+▶ Nueva reserva · buscadores y predicciones
+  ✔ país con buscador: «chi» + Tab = Chile, y el documento pasa a pasaporte (2944.4993ms)
+  ✔ al poner la entrada, la salida queda al día siguiente (428.1367ms)
+  ✔ se guarda la reserva del huésped extranjero (1186.6053ms)
+  ✔ huésped conocido: con su documento se completan sus datos (2277.7676ms)
+✔ Nueva reserva · buscadores y predicciones (10659.7471ms)
+▶ Registro TRA · predicciones
+  ✔ residencia en Chile: ciudad escrita, procedencia copiada y acompañante con pasaporte (4203.0383ms)
+✔ Registro TRA · predicciones (4203.376ms)
+▶ SIRE
+  ✔ tras el check-in, las dos entradas quedan por reportar con datos faltantes (1682.4016ms)
+  ✔ la ficha propone la nacionalidad y entrega los campos para copiar (1104.4568ms)
+  ✔ marcado como reportado sale de «Por reportar»; el otro sigue pendiente (636.1936ms)
+  ✔ tras el check-out aparece la salida (1278.8146ms)
+  ✔ el detalle de la reserva muestra el estado SIRE de cada movimiento (1278.9546ms)
+  ✔ «Desmarcar reportado» devuelve el movimiento a «Por reportar» (3492.2279ms)
+✔ SIRE (9474.2079ms)
+▶ SIRE · códigos y archivo TXT
+  ✔ Configuración TRA trae el código SIRE del establecimiento y el de la ciudad (1324.7402ms)
+  ✔ el TXT trae las 13 columnas y avisa el movimiento que quedó por fuera (4468.3066ms)
+✔ SIRE · códigos y archivo TXT (5793.6302ms)
+ℹ tests 13
+ℹ suites 4
+ℹ pass 13
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 31063.9164

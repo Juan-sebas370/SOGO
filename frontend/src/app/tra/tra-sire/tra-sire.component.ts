@@ -438,7 +438,7 @@ export class TraSireComponent implements OnDestroy {
     const lines = this.txtLines(grp).map(l => ({ l, sl: { rec: l.rec, guest: l.g, type: l.m.type, date: l.m.date } }));
     const ok = lines.filter(x => !missingCodes(x.sl, codes).length);
     const skipped = lines.filter(x => missingCodes(x.sl, codes).length)
-      .map(x => `${fullName(x.l.g)}: falta ${missingCodes(x.sl, codes).join(', ').toLowerCase()}`);
+      .map(x => `${fullName(x.l.g)} (${x.l.m.type === 'ENTRADA' ? 'entrada' : 'salida'}): falta ${missingCodes(x.sl, codes).join(', ').toLowerCase()}`);
     if (!ok.length) {
       this.txtNote = { date: grp.date, text: `No se generó el archivo. ${skipped.join(' · ')}. Revisa Configuración TRA › SIRE o repórtalos por formulario.` };
       return;

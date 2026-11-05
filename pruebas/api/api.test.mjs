@@ -2,7 +2,7 @@
 // SOGO · Pruebas de integración y seguridad de la API (node:test)
 //
 // Corren contra un backend de PRUEBA con su propia base de datos (nunca la real):
-//   QA_API=http://127.0.0.1:8091  QA_RESET_TOKEN=<reset_token del admin de prueba>
+//   QA_API=http://127.0.0.1:8091  QA_RESET_TOKEN=<reset_token del admin de prueba>  QA_ADMIN=...  QA_PASS=...
 //   node --test pruebas/api/
 // El token de restablecimiento lo deja el script 05_crear_administrador.sql en la base de prueba.
 // =====================================================================
@@ -13,8 +13,11 @@ import { createHmac } from 'node:crypto';
 const API = process.env.QA_API ?? 'http://127.0.0.1:8091';
 if (/:8081\b|:3306\b/.test(API)) throw new Error('Estas pruebas escriben datos: nunca se corren contra el SOGO real (8081).');
 
-const ADMIN_EMAIL = process.env.QA_ADMIN ?? 'sebastian@sogo.com';
-const ADMIN_PASS = 'Prueba#2026';
+// Credenciales del administrador de PRUEBA: solo por variables de entorno, nunca escritas aquí.
+// QA_PASS es la clave que esta prueba le fija con el token de restablecimiento.
+const ADMIN_EMAIL = process.env.QA_ADMIN;
+const ADMIN_PASS = process.env.QA_PASS;
+if (!ADMIN_EMAIL || !ADMIN_PASS) throw new Error('Define QA_ADMIN y QA_PASS para el administrador de la base de prueba.');
 let token = '';
 
 async function call(method, path, body, auth = token) {

@@ -16,6 +16,10 @@ const WEB = process.env.QA_WEB ?? 'http://localhost:4291';
 if (/:4201\b/.test(WEB)) throw new Error('Las pruebas E2E nunca se corren contra el SOGO real (4201).');
 const CHROME = process.env.CHROME_BIN ?? 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const SHOTS = join(dirname(fileURLToPath(import.meta.url)), 'capturas');
+// Credenciales del administrador de PRUEBA: solo por variables de entorno, nunca escritas aquí.
+const ADMIN = process.env.QA_ADMIN;
+const PASS = process.env.QA_PASS;
+if (!ADMIN || !PASS) throw new Error('Define QA_ADMIN y QA_PASS con el usuario administrador de la base de prueba.');
 
 let browser, page;
 const errors = [];
@@ -49,8 +53,8 @@ describe('Inicio de sesión', () => {
   });
 
   test('con usuario y clave correctos entra al panel', async () => {
-    await page.type('#lf-user', process.env.QA_ADMIN ?? 'sebastian@gmail.com');
-    await page.type('#lf-pass', process.env.QA_PASS ?? 'Prueba#2026');
+    await page.type('#lf-user', ADMIN);
+    await page.type('#lf-pass', PASS);
     await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click('button[type="submit"]')]);
     assert.match(page.url(), /\/dashboard/);
   });
